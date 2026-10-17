@@ -16,18 +16,37 @@
 ### 最快路径（推荐先跑这个）
 
 ```bash
-# 1. 服务器上（Ubuntu/Debian/CentOS 都行）
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/only-zh/keep-accounts/main/deploy/bootstrap.sh)"
-#    或者先把代码拉下来再跑：
-#    sudo REPO_URL=https://github.com/only-zh/keep-accounts bash deploy/bootstrap.sh
+# 1. 先拿最新代码到临时目录（public 仓库，不需要密钥）
+sudo rm -rf /tmp/ka-src
+sudo git clone --depth 1 https://github.com/only-zh/keep-accounts /tmp/ka-src
 
-# 2. 填 SMTP（不填注册收不到验证码）
+# 2. 确认脚本版本（应输出 SCRIPT_VERSION="2026-10-17.4" 或更高）
+grep -m1 SCRIPT_VERSION /tmp/ka-src/deploy/bootstrap.sh
+
+# 3. 执行（--adopt 对三种目录状态都安全，见下）
+sudo bash /tmp/ka-src/deploy/bootstrap.sh --adopt
+#    只预览不动系统：加 --dry-run
+
+# 4. 填 SMTP（不填注册收不到验证码）
 sudo -u keep nano /opt/keep-accounts/.env
 sudo systemctl restart keep-accounts
 
-# 3. 安全组放行 80/443 后，用域名访问；再打 APK
+# 5. 安全组放行 80/443 后，用域名访问；再打 APK
 KA_API_BASE=https://你的域名 bash build.sh
+rm -rf /tmp/ka-src
 ```
+
+> ⚠️ **不要用 `raw.githubusercontent.com` 的一行命令**：它有 CDN 缓存，
+> 刚推上去的脚本可能几分钟内仍返回旧版本，表现为"改了没生效"。
+> 用上面的 `git clone` 拿代码最可靠。
+
+`--adopt` 在三种情况下都安全：
+
+| 目录状态 | 行为 |
+|---|---|
+| 已有 `.git` | `git pull --ff-only` 更新 |
+| 空目录 / 只有 `data/` | `git clone`，`data/` 挪开再原样放回 |
+| 有代码但没有 `.git`（rsync/scp 上传的） | `git init` + 对齐到远端 `main`，保留 `.env` 与 `data/` |
 
 脚本是幂等的：重复跑只会更新代码，不会覆盖已存在的 `.env`；
 如果 `/opt/keep-accounts` 里**已经有 `data/`**（数据库），clone 时会先挪开再原样放回，不会删数据。
