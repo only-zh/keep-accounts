@@ -29,7 +29,9 @@ sudo systemctl restart keep-accounts
 KA_API_BASE=https://你的域名 bash build.sh
 ```
 
-脚本是幂等的，重复跑只会更新代码；不会覆盖已存在的 `.env`。
+脚本是幂等的：重复跑只会更新代码，不会覆盖已存在的 `.env`；
+如果 `/opt/keep-accounts` 里**已经有 `data/`**（数据库），clone 时会先挪开再原样放回，不会删数据。
+`bash deploy/bootstrap.sh --self-test` 可以在本机验证这段逻辑。
 
 ---
 

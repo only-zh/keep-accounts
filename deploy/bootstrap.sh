@@ -20,7 +20,11 @@ APP_DIR="${APP_DIR:-/opt/keep-accounts}"
 APP_USER="${APP_USER:-keep}"
 NODE_MAJOR="${NODE_MAJOR:-22}"
 DRY_RUN=0
-[ "${1:-}" = "--dry-run" ] && DRY_RUN=1
+SELFTEST=0
+case "${1:-}" in
+  --dry-run) DRY_RUN=1 ;;
+  --self-test) SELFTEST=1 ;;
+esac
 
 say()  { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
@@ -29,6 +33,32 @@ die()  { printf '\n\033[31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 run() {
   if [ "${DRY_RUN}" = "1" ]; then printf '  [dry-run] %s\n' "$*"; else eval "$@"; fi
 }
+
+# ---- 自测：--self-test 只验证「已有 data/ 的目录能否正确拉取代码」 ----
+if [ "${SELFTEST}" = "1" ]; then
+  SRC="$(cd "$(dirname "$0")/.." && pwd)"
+  TMP="$(mktemp -d)"
+  APP_DIR="${TMP}/app"
+  REPO_URL="file://${SRC}"
+  mkdir -p "${APP_DIR}/data"
+  echo "existing-db" > "${APP_DIR}/data/ledger.db"
+  info() { printf '  %s\n' "$*"; }
+  say()  { printf '\n▸ %s\n' "$*"; }
+  die()  { printf '✗ %s\n' "$*" >&2; exit 1; }
+  run()  { eval "$@"; }
+  say "自测：目录里已有 data/ 时拉取代码"
+  ensure_code_placeholder=1
+  # 复用正式流程里的 ensure_code 定义
+  eval "$(sed -n '/^ensure_code() {/,/^}/p' "$0")"
+  ensure_code "${APP_DIR}" "${REPO_URL}"
+  FAIL=0
+  [ -d "${APP_DIR}/.git" ] || { echo "  ❌ 没有 clone 成功"; FAIL=1; }
+  [ "$(cat "${APP_DIR}/data/ledger.db" 2>/dev/null)" = "existing-db" ] || { echo "  ❌ 原有 data/ 丢失"; FAIL=1; }
+  [ -f "${APP_DIR}/package.json" ] || { echo "  ❌ 代码文件缺失"; FAIL=1; }
+  rm -rf "${TMP}"
+  [ "${FAIL}" = "0" ] && echo "  ✅ 自测通过：代码已拉取，原有 data/ 完整保留" || exit 1
+  exit 0
+fi
 
 say "0. 环境检查"
 [ "$(uname -s)" = "Linux" ] || { [ "${DRY_RUN}" = "1" ] || die "这个脚本要在 Linux 上跑（当前是 $(uname -s)）"; }
@@ -103,18 +133,34 @@ fi
 say "3. 创建运行用户与目录"
 run "id -u ${APP_USER} >/dev/null 2>&1 || useradd -m -s /bin/bash ${APP_USER}"
 run "mkdir -p ${APP_DIR}"
-run "mkdir -p ${APP_DIR}/data"
 
 say "4. 拉取代码"
-if [ -d "${APP_DIR}/.git" ]; then
-  info "已存在仓库，执行更新"
-  run "git -C ${APP_DIR} pull --ff-only"
-else
-  if [ -n "$(ls -A "${APP_DIR}" 2>/dev/null || true)" ] && [ ! -d "${APP_DIR}/.git" ]; then
-    die "${APP_DIR} 不是空目录且不是 git 仓库，请先清理或换 APP_DIR"
+# 允许目录里只有 data/（脚本自己或上次部署留下的），clone 时把数据挪开再放回，绝不删除
+ensure_code() {
+  local dir="$1" url="$2"
+  if [ -d "${dir}/.git" ]; then
+    info "已存在仓库，执行更新"
+    run "git -C ${dir} pull --ff-only"
+    return 0
   fi
-  run "git clone --depth 1 ${REPO_URL} ${APP_DIR}"
-fi
+  local others
+  others="$(ls -A "${dir}" 2>/dev/null | grep -vx 'data' || true)"
+  if [ -n "${others}" ]; then
+    die "${dir} 里有其它内容（$(echo "${others}" | tr '\n' ' ')），请先清理或换 APP_DIR"
+  fi
+  if [ -d "${dir}/data" ]; then
+    info "检测到已有 data/ 目录：clone 时会原样保留"
+    run "mv ${dir}/data ${dir}.data.bak"
+    run "rmdir ${dir} 2>/dev/null || true"
+    run "git clone --depth 1 ${url} ${dir}"
+    run "mv ${dir}.data.bak ${dir}/data"
+  else
+    run "git clone --depth 1 ${url} ${dir}"
+  fi
+}
+
+ensure_code "${APP_DIR}" "${REPO_URL}"
+run "mkdir -p ${APP_DIR}/data"
 run "chown -R ${APP_USER}:${APP_USER} ${APP_DIR}"
 
 say "5. 配置文件"
