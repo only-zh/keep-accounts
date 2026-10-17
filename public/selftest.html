@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>记账本 · 自检</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0F1115; color: #E8EAF0; margin: 0; padding: 16px; }
+  h1 { font-size: 16px; }
+  #summary { font-size: 14px; margin: 10px 0; }
+  .ok { color: #4ADE80; }
+  .bad { color: #FF6B6B; }
+  pre { font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+  #statsMount { margin-top: 20px; }
+</style>
+</head>
+<body>
+<h1>记账本 · 浏览器端到端自检</h1>
+<div id="summary">running…</div>
+<pre id="out">running</pre>
+<div id="statsMount"></div>
+<script type="module">
+import { createStore } from '/js/store.js';
+
+const results = [];
+const ok = (label, cond, detail) => {
+  results.push({
+    ok: !!cond,
+    label,
+    actual: detail === undefined ? !!cond : detail,
+    expected: true,
+  });
+  // 进度标记：无头环境下卡在哪一步，看 <title> 就知道
+  document.title = `E2E|${results.length}|${label}`;
+};
+
+// 说明：整个自检只用一个 store 实例（通过切换 token 模拟不同账号）。
+// 多个 Store 会各开一条 IndexedDB 连接，在无头 Chrome 的 virtual-time 下
+// 第二条连接的事务不回调，会卡住——真浏览器没有这个问题。
+const store = createStore();
+
+const params = new URLSearchParams(location.search);
+const server = (params.get('server') || location.origin).replace(/\/+$/, '');
+localStorage.setItem('ka.serverUrl', JSON.stringify(server));
+localStorage.removeItem('ka.token');
+localStorage.removeItem('ka.activeBookId');
+localStorage.removeItem('ka.lastSync');
+
+const stamp = Date.now().toString(36);
+
+async function api(path, { method = 'GET', body = null, token = null } = {}) {
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${server}${path}`, { method, headers, body: body ? JSON.stringify(body) : null });
+  let json = null;
+  try { json = await res.json(); } catch { json = null; }
+  return { status: res.status, data: json ? json.data : null, error: json ? json.error : null, code: json ? json.code : null };
+}
+
+async function register(name) {
+  const email = `e2e_${stamp}_${name}@test.com`;
+  const codeRes = await api('/api/auth/code', { method: 'POST', body: { email } });
+  const code = codeRes.data && codeRes.data.devCode;
+  const res = await api('/api/auth/register', {
+    method: 'POST', body: { email, code, displayName: name, password: 'Passw0rd123' },
+  });
+  return { email, token: res.data ? res.data.token : null, account: res.data ? res.data.account : null, res, codeRes };
+}
+
+/** 切换当前账号（复用同一个 store 实例） */
+async function asUser(user, bookId = null) {
+  store.token = user.token;
+  localStorage.setItem('ka.token', JSON.stringify(user.token));
+  await store.loadBootstrap(bookId);
+}
+
+try {
+  /* ---------- 0. 服务与开发模式 ---------- */
+  const cfg = await api('/api/config');
+  ok('服务可用（/api/config 200）', cfg.status === 200, cfg.status);
+  ok('未配置邮件时回显验证码（本自检依赖它）', cfg.data && cfg.data.devShowCode === true, cfg.data && cfg.data.devShowCode);
+
+  /* ---------- 1. 注册三个账号 ---------- */
+  const A = await register('甲');
+  const B = await register('乙');
+  const C = await register('丙');
+  ok('注册账号 甲 成功', A.res.status === 200, A.res.status);
+  ok('注册账号 乙 成功', B.res.status === 200, B.res.status);
+  ok('注册账号 丙 成功', C.res.status === 200, C.res.status);
+  ok('返回会话 token', !!A.token && !!B.token && !!C.token);
+
+  /* ---------- 2. 账本 / 邀请码 / 数据隔离 ---------- */
+  const created = await api('/api/books', { method: 'POST', body: { name: '自检账本', emoji: '🧪' }, token: A.token });
+  const bookId = created.data.book.id;
+  const inviteCode = created.data.book.inviteCode;
+  ok('甲创建账本（角色 owner）', created.data.book.role === 'owner');
+  ok('账本带 8 位邀请码', /^[A-Z0-9]{8}$/.test(inviteCode || ''), inviteCode);
+
+  const joined = await api('/api/books/join', { method: 'POST', body: { code: inviteCode }, token: B.token });
+  ok('乙用邀请码加入（角色 member）', joined.data && joined.data.book.role === 'member');
+  ok('账本人数 = 2', joined.data && joined.data.book.memberCount === 2);
+
+  const outsider = await api(`/api/records?bookId=${bookId}`, { token: C.token });
+  ok('丙（非成员）读取被拒 404 —— 数据隔离', outsider.status === 404, outsider.status);
+
+  /* ---------- 3. 甲：store 初始化与记账 ---------- */
+  await asUser(A, bookId);
+  ok('store 处于登录态', store.loggedIn === true);
+  ok('store 拿到账本与角色', store.book && store.book.id === bookId && store.role === 'owner');
+  ok('store 拿到成员列表', store.members.length === 2, store.members.length);
+  ok('owner 具备管理员权限', store.isManager === true);
+
+  const r1 = await store.sendMessage('昨天午饭35');
+  const rec1 = r1.reply.records[0];
+  ok('甲记一笔：金额 35 元', rec1.amountCents === 3500, rec1.amountCents);
+  ok('甲记一笔：author = 甲', rec1.authorAccountId === A.account.id);
+  ok('甲记一笔：payer = 甲', rec1.payerAccountId === A.account.id);
+  ok('聊天流里出现卡片', store.messages.some((m) => (m.payload?.recordIds || []).includes(rec1.id)));
+
+  /* ---------- 4. 乙（普通成员）：能看到、不能改别人的、能改自己的 ---------- */
+  await asUser(B, bookId);
+  ok('乙看到同一账本的记录（群聊语义）', store.activeRecords().length >= 1, store.activeRecords().length);
+  ok('乙的 canEdit(甲的卡片) = false', store.canEdit(rec1) === false);
+  ok('乙不是管理员', store.isManager === false);
+
+  let blocked = null;
+  try { await store.updateRecord(rec1.id, { amountCents: 9999 }); } catch (e) { blocked = e; }
+  ok('乙改甲的卡片被服务端拒绝（403）', blocked && blocked.status === 403, blocked && blocked.status);
+
+  const bRec = (await store.sendMessage('打车 28')).reply.records[0];
+  ok('乙能记自己的账（author = 乙）', bRec.authorAccountId === B.account.id);
+  ok('乙的 canEdit(自己的卡片) = true', store.canEdit(bRec) === true);
+
+  /* ---------- 5. 甲（创建者）：改任何人的卡片、分配管理员 ---------- */
+  await asUser(A, bookId);
+  ok('切回甲：角色 owner', store.role === 'owner');
+  const ownerEdit = await store.updateRecord(bRec.id, { amountCents: 3000 });
+  ok('甲（创建者）能改乙的卡片', ownerEdit.amountCents === 3000, ownerEdit.amountCents);
+
+  await store.setMemberRole(B.account.id, 'admin');
+  ok('甲把乙设为管理员', store.members.find((m) => m.accountId === B.account.id).role === 'admin');
+
+  /* ---------- 6. 乙（管理员）：能改任何人的卡片 ---------- */
+  await asUser(B, bookId);
+  ok('乙现在具备管理员权限', store.isManager === true);
+  const adminEdit = await store.updateRecord(rec1.id, { amountCents: 3600 });
+  ok('乙（管理员）能改甲的卡片', adminEdit.amountCents === 3600, adminEdit.amountCents);
+
+  let notOwner = null;
+  try { await store.setMemberRole(A.account.id, 'member'); } catch (e) { notOwner = e; }
+  ok('乙（管理员）不能分配管理员（仅创建者）', notOwner && notOwner.status === 403, notOwner && notOwner.status);
+
+  /* ---------- 7. @ 记账权限 ---------- */
+  const atByAdmin = await store.sendMessage('@甲 买水果 40');
+  ok('管理员用 @ 记账：付款人 = 被 @ 的甲', atByAdmin.reply.records[0].payerAccountId === A.account.id);
+  ok('author 仍是发送者乙（决定谁能改）', atByAdmin.reply.records[0].authorAccountId === B.account.id);
+
+  await asUser(A, bookId);
+  await store.setMemberRole(B.account.id, 'member');
+  ok('甲把乙降回普通成员', store.members.find((m) => m.accountId === B.account.id).role === 'member');
+
+  /* ---------- 8. 丙：加入后是普通成员，@ 被忽略 ---------- */
+  await asUser(C); // 丙还没有任何账本
+  const joinData = await store.apiRaw('/api/books/join', { method: 'POST', body: { code: inviteCode } });
+  ok('丙用邀请码加入成功', joinData && joinData.book && joinData.book.role === 'member');
+  await store.loadBootstrap(joinData.book.id);
+  ok('丙的 store 里出现该账本', store.book && store.book.id === bookId);
+  ok('丙（普通成员）不是管理员', store.isManager === false);
+
+  const atByMember = await store.sendMessage('@甲 买菜 30');
+  ok('普通成员用 @：付款人被忽略、记到自己头上', atByMember.reply.records[0].payerAccountId === C.account.id);
+  ok('普通成员用 @：给出权限提示', (atByMember.reply.warnings || []).some((w) => /只有账本管理员/.test(w)));
+
+  /* ---------- 9. 配额接口 ---------- */
+  // 10 个账本上限与超限拒绝由 tests/api.test.mjs 完整覆盖；
+  // 这里只确认接口通、返回了配额信息（避免自检跑十几次网络往返）。
+  const another = await api('/api/books', { method: 'POST', body: { name: '第二个账本' }, token: A.token });
+  ok('还能继续创建账本', another.status === 200, another.status);
+  const bookList = await api('/api/books', { token: A.token });
+  ok('账本接口返回配额信息', bookList.data.quotas.maxBooksPerAccount === 10 && bookList.data.stats.booksCreated === 2,
+    `${bookList.data.stats.booksCreated}/${bookList.data.quotas.maxBooksPerAccount}`);
+
+  /* ---------- 10. 断网：只读 + 发送失败不入账 ---------- */
+  await asUser(A, bookId);
+  const before = store.activeRecords().length;
+  store.online = false;
+  let offlineErr = null;
+  try { await store.sendMessage('断网测试 1'); } catch (e) { offlineErr = e; }
+  ok('断网时发送抛错', !!offlineErr);
+  const failed = await store.rememberFailed('断网测试 1', { reason: '网络不可用' });
+  ok('失败消息进入「未发送」列表', store.failed.some((f) => f.id === failed.id));
+  ok('失败消息不会入账', store.activeRecords().length === before, store.activeRecords().length);
+  store.online = true;
+  await store.forgetFailed(failed.id);
+
+  /* ---------- 11. 统计页渲染 ---------- */
+  const mod = await import('/js/stats-page.js');
+  const mount = document.getElementById('statsMount');
+  const page = mod.createStatsPage({
+    mount,
+    getState: () => ({
+      records: store.activeRecords(),
+      users: store.members.map((m) => ({ id: m.accountId, name: m.displayName, emoji: m.emoji, color: m.color })),
+      books: store.books,
+      activeBookId: store.activeBookId,
+      config: { largeThresholdCents: 5000 },
+      today: store.today,
+    }),
+    onOpenRecord: () => {},
+  });
+  page.render();
+  await new Promise((r) => setTimeout(r, 400));
+  ok('统计页有图表（SVG ≥2）', mount.querySelectorAll('svg').length >= 2, mount.querySelectorAll('svg').length);
+  ok('统计页有金额', mount.textContent.includes('¥'));
+  ok('统计页有范围与筛选', mount.textContent.includes('本月') && /成员|类别/.test(mount.textContent));
+  page.refresh();
+  ok('统计页可刷新', mount.querySelectorAll('svg').length >= 2);
+
+  /* ---------- 12. 登出 ---------- */
+  await store.logout();
+  ok('登出后清空登录态', store.loggedIn === false && store.books.length === 0);
+} catch (err) {
+  results.push({ ok: false, label: 'EXCEPTION', error: String((err && err.stack) || err) });
+}
+
+const failedList = results.filter((r) => !r.ok);
+document.documentElement.setAttribute('data-e2e-total', String(results.length));
+document.documentElement.setAttribute('data-e2e-failed', String(failedList.length));
+document.documentElement.setAttribute('data-e2e', JSON.stringify(results).slice(0, 14000));
+document.getElementById('summary').innerHTML = failedList.length
+  ? `<span class="bad">失败 ${failedList.length} / ${results.length}</span>`
+  : `<span class="ok">全部通过 ${results.length} 项 ✅</span>`;
+document.getElementById('out').textContent = failedList.length
+  ? failedList.map((f) => `✗ ${f.label}\n   实际 ${JSON.stringify(f.actual)} / 期望 ${JSON.stringify(f.expected)}${f.error ? `\n   ${f.error}` : ''}`).join('\n')
+  : '（无失败项）';
+</script>
+</body>
+</html>

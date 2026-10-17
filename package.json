@@ -1,0 +1,22 @@
+{
+  "name": "keep-accounts",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "聊天式多人记账：语音/文字输入、自动识别金额类别日期、账本群聊与角色权限、账号体系与配额、统计图表；Node + SQLite 零依赖后端",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node tests/parse.test.mjs && node tests/qr.test.mjs && node tests/api.test.mjs && node tests/smtp.test.mjs",
+    "test:parse": "node tests/parse.test.mjs",
+    "test:api": "node tests/api.test.mjs",
+    "apk": "bash build.sh",
+    "test:qr": "node tests/qr.test.mjs",
+    "seed": "node tools/seed-demo.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

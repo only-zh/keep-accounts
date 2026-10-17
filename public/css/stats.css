@@ -1,0 +1,781 @@
+/* ==========================================================================
+ * stats.css —— 统计页样式（stats-page.js 专用，全部选择器使用 st- 前缀）
+ *
+ * 约定：
+ *  1. 深色优先，颜色一律读应用的 CSS 变量，并带安全回退值；
+ *  2. 移动端优先：单列 → ≥760px 双列 / 四列；不允许出现整页横向滚动；
+ *  3. 所有可点元素触控高度 ≥ 40px；底部留 safe-area 内边距；
+ *  4. 数字统一 tabular-nums，避免跳动。
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * §0 页面容器
+ * -------------------------------------------------------------------------- */
+
+.st-page {
+  --st-radius: 14px;
+  --st-radius-sm: 10px;
+  --st-up: #FF6B6B;      /* 支出上涨 / 结余为负 */
+  --st-down: #3FD0A4;    /* 支出下降 / 结余为正 */
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: clip;                 /* 兜底：不允许横向拖动整页（不产生滚动容器） */
+  color-scheme: dark;               /* 原生日期选择器 / 数字步进器跟随深色 */
+  color: var(--text, #E8EAF0);
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+  padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.st-page *,
+.st-page *::before,
+.st-page *::after {
+  box-sizing: border-box;
+}
+
+.st-page > * {
+  min-width: 0;
+}
+
+.st-page button {
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.st-page :focus-visible {
+  outline: 2px solid var(--brand, #6C8CFF);
+  outline-offset: 2px;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * §1 面板（范围 / 筛选外壳）
+ * -------------------------------------------------------------------------- */
+
+.st-panel,
+.st-card {
+  min-width: 0;
+  background: var(--card, #171A21);
+  border: 1px solid var(--border, #242833);
+  border-radius: var(--st-radius);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.st-panel {
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.st-panel__head,
+.st-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.st-panel__head {
+  margin-bottom: 8px;
+}
+
+.st-panel__title,
+.st-card__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text, #E8EAF0);
+}
+
+.st-panel__title {
+  font-size: 13px;
+}
+
+.st-card__title {
+  font-size: 14px;
+}
+
+.st-range-resolved,
+.st-card__hint {
+  font-size: 12px;
+  color: var(--muted, #8A90A0);
+  font-variant-numeric: tabular-nums;
+}
+
+.st-card__hint {
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+ * §2 chip（范围 / 成员 / 类别 / 类型 / 仅看大额）与横向滚动行
+ * -------------------------------------------------------------------------- */
+
+.st-chips,
+.st-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px;
+  margin: -2px;
+}
+
+.st-chips::-webkit-scrollbar,
+.st-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.st-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--border, #242833);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text, #E8EAF0);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.st-chip:active {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.st-chip.is-active {
+  background: rgba(108, 140, 255, 0.18);
+  border-color: var(--brand, #6C8CFF);
+  color: var(--brand, #6C8CFF);
+  font-weight: 600;
+}
+
+.st-chip__emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.st-chip__text {
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+ * §3 自定义区间 / 输入框 / 按钮
+ * -------------------------------------------------------------------------- */
+
+.st-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border, #242833);
+}
+
+.st-custom__sep {
+  color: var(--muted, #8A90A0);
+  font-size: 13px;
+}
+
+.st-date,
+.st-input {
+  min-height: 40px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--border, #242833);
+  border-radius: var(--st-radius-sm);
+  background: var(--bg, #0F1115);
+  color: var(--text, #E8EAF0);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.st-date {
+  flex: 1 1 128px;
+}
+
+.st-input:focus,
+.st-date:focus {
+  border-color: var(--brand, #6C8CFF);
+}
+
+.st-input::placeholder {
+  color: var(--muted, #8A90A0);
+}
+
+.st-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border, #242833);
+  border-radius: var(--st-radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text, #E8EAF0);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.st-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.st-btn--primary {
+  background: rgba(108, 140, 255, 0.2);
+  border-color: var(--brand, #6C8CFF);
+  color: var(--brand, #6C8CFF);
+  font-weight: 600;
+}
+
+.st-btn--ghost {
+  background: transparent;
+}
+
+/* --------------------------------------------------------------------------
+ * §4 筛选区
+ * -------------------------------------------------------------------------- */
+
+.st-filter-group + .st-filter-group {
+  margin-top: 10px;
+}
+
+.st-filter-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted, #8A90A0);
+}
+
+.st-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.st-amount {
+  display: flex;
+  flex: 1 1 190px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.st-input--num {
+  flex: 1 1 0;
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-input--kw {
+  flex: 1 1 190px;
+}
+
+.st-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border, #242833);
+}
+
+/* --------------------------------------------------------------------------
+ * §5 结果区 / 概览行
+ * -------------------------------------------------------------------------- */
+
+.st-results {
+  min-width: 0;
+}
+
+.st-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 8px;
+  font-size: 12px;
+  color: var(--muted, #8A90A0);
+}
+
+.st-summary__range {
+  font-variant-numeric: tabular-nums;
+}
+
+.st-summary__sep,
+.st-metric__sep {
+  color: var(--grid, #2A2F3A);
+}
+
+/* --------------------------------------------------------------------------
+ * §6 指标卡（手机 2 列，宽屏 4 列；宽卡横跨 2 列）
+ * -------------------------------------------------------------------------- */
+
+.st-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.st-metric {
+  min-width: 0;
+  padding: 12px;
+  background: var(--card, #171A21);
+  border: 1px solid var(--border, #242833);
+  border-radius: var(--st-radius);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
+}
+
+.st-metric--wide {
+  grid-column: 1 / -1;
+}
+
+.st-metric--accent {
+  background: linear-gradient(180deg, rgba(108, 140, 255, 0.16), rgba(108, 140, 255, 0.04));
+  border-color: rgba(108, 140, 255, 0.36);
+}
+
+.st-metric__label {
+  font-size: 12px;
+  color: var(--muted, #8A90A0);
+}
+
+.st-metric__value {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-metric--wide .st-metric__value {
+  font-size: 24px;
+}
+
+.st-metric__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted, #8A90A0);
+}
+
+.st-metric__subtext {
+  font-variant-numeric: tabular-nums;
+}
+
+.st-delta {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-delta.is-up {
+  color: var(--st-up);
+}
+
+.st-delta.is-down {
+  color: var(--st-down);
+}
+
+.st-delta.is-flat {
+  color: var(--muted, #8A90A0);
+}
+
+.st-net {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-net.is-positive {
+  color: var(--st-down);
+}
+
+.st-net.is-negative {
+  color: var(--st-up);
+}
+
+/* --------------------------------------------------------------------------
+ * §7 图表卡片
+ * -------------------------------------------------------------------------- */
+
+.st-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.st-card {
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.st-charts .st-card {
+  margin-bottom: 0;
+}
+
+.st-card__head {
+  margin-bottom: 6px;
+}
+
+.st-chart {
+  width: 100%;
+  min-width: 0;
+}
+
+.st-chart-empty {
+  padding: 28px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted, #8A90A0);
+}
+
+/* 口径切换（我该承担 / 我付的） */
+.st-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border, #242833);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.st-seg__btn {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted, #8A90A0);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.st-seg__btn.is-active {
+  background: rgba(108, 140, 255, 0.2);
+  color: var(--brand, #6C8CFF);
+  font-weight: 600;
+}
+
+/* 月份步进器 */
+.st-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.st-stepper__btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border, #242833);
+  border-radius: var(--st-radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text, #E8EAF0);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.st-stepper__btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.st-stepper__label {
+  min-width: 92px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted, #8A90A0);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+ * §8 记录行（大额消费 / 明细）
+ * -------------------------------------------------------------------------- */
+
+.st-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.st-details {
+  min-width: 0;
+}
+
+.st-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border, #242833);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.st-row:last-child {
+  border-bottom: 0;
+}
+
+.st-row:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.st-row__date {
+  min-width: 38px;
+  font-size: 12px;
+  color: var(--muted, #8A90A0);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.st-row__icon {
+  width: 22px;
+  font-size: 17px;
+  text-align: center;
+}
+
+.st-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.st-row__title {
+  font-size: 14px;
+  color: var(--text, #E8EAF0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-row__meta {
+  font-size: 12px;
+  color: var(--muted, #8A90A0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-row__amount {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-row__amount.is-in {
+  color: var(--st-down);
+}
+
+/* --------------------------------------------------------------------------
+ * §9 分类明细表（金额 + 占比细条 + 笔数）
+ * -------------------------------------------------------------------------- */
+
+.st-cat-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.st-cat-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon name amount"
+    "icon bar  meta";
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 6px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border, #242833);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.st-cat-row:last-child {
+  border-bottom: 0;
+}
+
+.st-cat-row:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.st-cat-row__icon {
+  grid-area: icon;
+  font-size: 17px;
+  text-align: center;
+}
+
+.st-cat-row__name {
+  grid-area: name;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-cat-row__amount {
+  grid-area: amount;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-cat-row__bar {
+  grid-area: bar;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--grid, #2A2F3A);
+  overflow: hidden;
+}
+
+.st-cat-row__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand, #6C8CFF);
+}
+
+.st-cat-row__meta {
+  grid-area: meta;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #8A90A0);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-more {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* --------------------------------------------------------------------------
+ * §10 空状态
+ * -------------------------------------------------------------------------- */
+
+.st-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  text-align: center;
+}
+
+.st-empty__emoji {
+  font-size: 30px;
+  line-height: 1.2;
+}
+
+.st-empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #E8EAF0);
+}
+
+.st-empty__hint {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted, #8A90A0);
+}
+
+.st-empty .st-btn {
+  margin-top: 8px;
+}
+
+.st-inline-empty {
+  padding: 18px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted, #8A90A0);
+}
+
+/* --------------------------------------------------------------------------
+ * §11 宽屏（平板 / 桌面）
+ * -------------------------------------------------------------------------- */
+
+@media (min-width: 760px) {
+  .st-page {
+    padding: 16px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .st-panel,
+  .st-card {
+    padding: 14px;
+  }
+
+  .st-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .st-metric--wide {
+    grid-column: span 2;
+  }
+
+  .st-metric--wide .st-metric__value {
+    font-size: 26px;
+  }
+
+  .st-charts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .st-card--wide {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * §12 减少动效
+ * -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .st-chip,
+  .st-btn {
+    transition: none;
+  }
+}

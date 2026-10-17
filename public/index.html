@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0F1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>记账本</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📒</text></svg>">
+<link rel="stylesheet" href="./css/styles.css">
+<link rel="stylesheet" href="./css/stats.css">
+</head>
+<body>
+
+<!-- ============================================================
+     认证页：邮箱验证码注册 / 密码登录
+     ============================================================ -->
+<section id="authView" class="auth-view hidden">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="auth-logo">📒</span>
+      <h1>记账本</h1>
+      <p class="auth-slogan">说一句话就记好一笔账</p>
+    </div>
+
+    <div class="auth-tabs" role="tablist">
+      <button id="authTabLogin" class="auth-tab active" type="button" role="tab">登录</button>
+      <button id="authTabRegister" class="auth-tab" type="button" role="tab">注册</button>
+    </div>
+
+    <form id="loginForm" class="auth-form" autocomplete="on">
+      <label class="auth-field">
+        <span>邮箱</span>
+        <input id="loginEmail" type="email" inputmode="email" autocomplete="username" placeholder="you@example.com" required>
+      </label>
+      <label class="auth-field">
+        <span>密码</span>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入登录密码" required>
+      </label>
+      <p id="loginError" class="auth-error hidden"></p>
+      <button id="loginSubmit" class="auth-submit" type="submit">登录</button>
+    </form>
+
+    <form id="registerForm" class="auth-form hidden" autocomplete="on">
+      <label class="auth-field">
+        <span>邮箱</span>
+        <input id="regEmail" type="email" inputmode="email" autocomplete="email" placeholder="用于接收验证码" required>
+      </label>
+      <label class="auth-field">
+        <span>邮箱验证码</span>
+        <div class="auth-inline">
+          <input id="regCode" type="text" inputmode="numeric" maxlength="6" placeholder="6 位数字" required>
+          <button id="sendCodeBtn" class="auth-inline-btn" type="button">获取验证码</button>
+        </div>
+      </label>
+      <p id="codeHint" class="auth-hint hidden"></p>
+      <label class="auth-field">
+        <span>昵称（账本里显示的名字）</span>
+        <input id="regName" type="text" maxlength="20" placeholder="例如：小明" required>
+      </label>
+      <label class="auth-field">
+        <span>设置登录密码</span>
+        <input id="regPassword" type="password" autocomplete="new-password" placeholder="至少 8 位，需含字母和数字" required>
+      </label>
+      <p id="registerError" class="auth-error hidden"></p>
+      <button id="registerSubmit" class="auth-submit" type="submit">注册并进入</button>
+    </form>
+
+    <p class="auth-foot">
+      继续使用即表示你已阅读并同意
+      <a class="auth-link" href="./terms.html">《用户协议》</a>
+      与
+      <a class="auth-link" href="./privacy.html">《隐私政策》</a>
+    </p>
+  </div>
+
+</section>
+
+<!-- ============================================================
+     主界面：账本列表 / 设置 / 群聊 / 明细 / 统计 / 搜索
+     ============================================================ -->
+<div id="app" class="app hidden">
+
+  <!-- ---------------- 账本列表（首页） ---------------- -->
+  <section id="pageBooks" class="page">
+    <header class="nav">
+      <h1 class="nav-title">账本</h1>
+      <div class="nav-actions">
+        <button id="searchBtn" class="nav-icon" type="button" title="搜索账本和记录" aria-label="搜索">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.2 4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button id="addBtn" class="nav-icon" type="button" title="创建 / 加入账本" aria-label="创建或加入账本">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+    <div id="offlineBar" class="offline-bar hidden">
+      <span class="dot"></span>
+      <span id="offlineText">当前离线 · 只能查看已同步的记录</span>
+      <button id="retryOnlineBtn" type="button">重试</button>
+    </div>
+    <div id="bookList" class="book-list"></div>
+  </section>
+
+  <!-- ---------------- 设置 ---------------- -->
+  <section id="pageSettings" class="page hidden">
+    <header class="nav">
+      <h1 class="nav-title">设置</h1>
+    </header>
+    <div id="settingsBody" class="settings-body"></div>
+  </section>
+
+  <!-- ---------------- 群聊 ---------------- -->
+  <section id="pageChat" class="page hidden">
+    <header class="nav">
+      <button id="chatBack" class="nav-icon" type="button" title="返回" aria-label="返回">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="nav-center">
+        <div id="chatTitle" class="nav-title">账本</div>
+        <div id="chatSub" class="nav-sub"></div>
+      </div>
+      <div class="nav-actions">
+        <button id="detailBtn" class="nav-text" type="button">明细</button>
+        <button id="membersBtn" class="nav-text" type="button">成员</button>
+      </div>
+    </header>
+    <div id="messages" class="messages" aria-live="polite"></div>
+    <footer id="composer" class="composer">
+      <div id="voiceRow" class="voice-row">
+        <button id="keyboardBtn" class="icon-btn" type="button" title="切换到文字输入" aria-label="切换到文字输入">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M7 13.5h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
+        <button id="voiceBtn" class="voice-btn" type="button" aria-label="长按说话">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6a3.1 3.1 0 0 1 3.1 3.1v5a3.1 3.1 0 0 1-6.2 0v-5A3.1 3.1 0 0 1 12 3.6Z" fill="currentColor"/><path d="M5.6 11.2a.9.9 0 0 1 1.8 0 4.6 4.6 0 0 0 9.2 0 .9.9 0 1 1 1.8 0 6.4 6.4 0 0 1-5.5 6.3v2.1a.9.9 0 1 1-1.8 0v-2.1a6.4 6.4 0 0 1-5.5-6.3Z" fill="currentColor"/></svg>
+          <span class="voice-hint">按住 说话</span>
+        </button>
+      </div>
+
+      <div id="textRow" class="text-row hidden">
+        <textarea id="textInput" rows="1" placeholder="例如：昨天午饭35" enterkeyhint="send"></textarea>
+        <button id="micBtn" class="icon-btn" type="button" title="切换到语音输入" aria-label="切换到语音输入">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6a3.1 3.1 0 0 1 3.1 3.1v5a3.1 3.1 0 0 1-6.2 0v-5A3.1 3.1 0 0 1 12 3.6Z" fill="currentColor"/><path d="M5.6 11.2a.9.9 0 0 1 1.8 0 4.6 4.6 0 0 0 9.2 0 .9.9 0 1 1 1.8 0 6.4 6.4 0 0 1-5.5 6.3v2.1a.9.9 0 1 1-1.8 0v-2.1a6.4 6.4 0 0 1-5.5-6.3Z" fill="currentColor"/></svg>
+        </button>
+        <button id="sendBtn" class="send-btn" type="button">发送</button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- ---------------- 明细 ---------------- -->
+  <section id="pageDetail" class="page hidden">
+    <header class="nav">
+      <button id="detailBack" class="nav-icon" type="button" title="返回" aria-label="返回">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="nav-center"><div class="nav-title">明细</div></div>
+      <div class="nav-actions"><button id="detailStats" class="nav-text" type="button">统计</button></div>
+    </header>
+    <div id="detailBody" class="detail-body"></div>
+  </section>
+
+  <!-- ---------------- 统计 ---------------- -->
+  <section id="pageStats" class="page hidden">
+    <header class="nav">
+      <button id="statsBack" class="nav-icon" type="button" title="返回" aria-label="返回">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="nav-center"><div class="nav-title">统计</div></div>
+      <div class="nav-actions"></div>
+    </header>
+    <div id="statsMount"></div>
+  </section>
+
+  <!-- ---------------- 搜索 ---------------- -->
+  <section id="pageSearch" class="page hidden">
+    <header class="nav">
+      <button id="searchBack" class="nav-icon" type="button" title="返回" aria-label="返回">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <input id="searchInput" class="search-input" type="search" placeholder="搜索账本或记账记录" autocomplete="off">
+    </header>
+    <div id="searchBody" class="search-body"></div>
+  </section>
+
+  <!-- ---------------- 底部导航（仅首页/设置） ---------------- -->
+  <nav id="tabbar" class="tabbar">
+    <button id="tabBooks" class="tab active" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.2A2.2 2.2 0 0 1 6.2 4H12v16H6.2A2.2 2.2 0 0 1 4 17.8V6.2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 4h5.8A2.2 2.2 0 0 1 20 6.2v11.6a2.2 2.2 0 0 1-2.2 2.2H12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      <span>账本</span>
+    </button>
+    <button id="tabSettings" class="tab" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M5.9 5.9l1.6 1.6M16.5 16.5l1.6 1.6M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>设置</span>
+    </button>
+  </nav>
+
+  <!-- ---------------- 录音浮层 ---------------- -->
+  <div id="recOverlay" class="rec-overlay hidden" aria-hidden="true">
+    <div id="recPanel" class="rec-panel">
+      <div class="rec-wave" id="recWave"></div>
+      <div class="rec-info">
+        <span id="recState" class="rec-state">正在聆听…</span>
+        <span id="recHint" class="rec-hint">松开发送 · 上滑取消</span>
+      </div>
+      <div id="recTimer" class="rec-timer">0:00</div>
+    </div>
+  </div>
+
+  <!-- ---------------- 通用弹层 / toast ---------------- -->
+  <div id="sheetMask" class="sheet-mask hidden"></div>
+  <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true">
+    <div class="sheet-grab"></div>
+    <div id="sheetBody" class="sheet-body"></div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+</div>
+
+<script>
+window.__errors = [];
+(function () {
+  function mark(msg) {
+    var text = String(msg || 'error').slice(0, 300);
+    window.__errors.push(text);
+    document.documentElement.setAttribute('data-js-error', text);
+  }
+  window.addEventListener('error', function (e) { mark(e.message || (e.error && e.error.message)); });
+  window.addEventListener('unhandledrejection', function (e) { mark(e.reason && (e.reason.message || e.reason)); });
+})();
+</script>
+<script src="./config.js"></script>
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

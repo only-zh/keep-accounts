@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1115">
+<title>隐私政策 · 记账本</title>
+<link rel="stylesheet" href="./css/styles.css">
+<style>
+  .legal { max-width: 720px; margin: 0 auto; padding: 18px 18px calc(28px + var(--safe-b)); }
+  .legal h1 { font-size: 20px; margin: 8px 0 4px; }
+  .legal .meta { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .legal h2 { font-size: 15px; margin: 22px 0 8px; }
+  .legal p, .legal li { font-size: 13.5px; line-height: 1.75; color: #C9CDD8; }
+  .legal ul { padding-left: 20px; margin: 8px 0; }
+  .legal table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12.5px; }
+  .legal th, .legal td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; color: #C9CDD8; }
+  .legal th { background: var(--card); color: var(--text); font-weight: 600; }
+  .legal .back {
+    display: inline-flex; align-items: center; gap: 6px;
+    min-height: 38px; padding: 0 12px;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--card); color: var(--text);
+    font-size: 13px; text-decoration: none;
+  }
+  .legal .foot { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="legal">
+  <a class="back" href="./" onclick="if (history.length > 1) { history.back(); return false; }">← 返回</a>
+
+  <h1>隐私政策</h1>
+  <div class="meta">版本 1.0 · 生效日期：待填写</div>
+
+  <p>本政策说明「记账本」收集哪些信息、如何使用与保护，以及你可以行使哪些权利。我们只收集为提供服务所必需的信息。</p>
+
+  <h2>1. 我们收集的信息</h2>
+  <table>
+    <tr><th>信息</th><th>内容</th><th>用途</th></tr>
+    <tr>
+      <td>账号信息</td>
+      <td>邮箱、昵称、头像（从预设图标中选择）</td>
+      <td>注册、登录、在账本中标识你</td>
+    </tr>
+    <tr>
+      <td>登录凭据</td>
+      <td>密码（以 scrypt 加盐哈希存储，无法还原明文）、登录会话令牌、最后登录时间</td>
+      <td>身份验证与会话保持</td>
+    </tr>
+    <tr>
+      <td>记账数据</td>
+      <td>金额、类别、日期时间、备注、商户、付款人与分摊成员、你输入的原始文字</td>
+      <td>记账、统计与在同一账本内共享</td>
+    </tr>
+    <tr>
+      <td>语音转写</td>
+      <td>录音转成的文字（<strong>不保存录音文件</strong>）</td>
+      <td>把你的语音变成可记账的文字</td>
+    </tr>
+    <tr>
+      <td>诊断信息</td>
+      <td>每次解析的输入与模型返回结果、耗时、是否成功</td>
+      <td>排查识别错误、改进解析效果</td>
+    </tr>
+    <tr>
+      <td>设备本地存储</td>
+      <td>登录令牌、离线缓存（IndexedDB）、界面偏好</td>
+      <td>免重复登录、断网时只读查看</td>
+    </tr>
+  </table>
+
+  <h2>2. 第三方处理</h2>
+  <ul>
+    <li><strong>智能解析（模型服务）</strong>：为把「昨天午饭35」这类句子解析成结构化记账数据，你输入的<strong>文字内容</strong>会发送给所连接的服务器配置的模型服务（默认 DeepSeek）。若服务器未配置模型密钥，则仅在本机按规则解析，不产生外部请求。</li>
+    <li><strong>语音识别（可选）</strong>：若服务器启用了语音识别，录音音频会发送给所配置的识别服务用于转写；转写完成后音频即被丢弃，不写入数据库、不做留存。</li>
+    <li><strong>邮件服务（SMTP）</strong>：注册验证码通过邮件服务商发送到你的邮箱。</li>
+    <li>我们不会将你的记账数据出售或用于广告投放。</li>
+  </ul>
+
+  <h2>3. 谁会看到你的数据</h2>
+  <ul>
+    <li><strong>同一账本的成员</strong>：可看到彼此的记账卡片、明细与统计，这是多人记账的必要设计。</li>
+    <li><strong>账本创建者与管理员</strong>：可修改他人的记账卡片、可移出成员。成员被移出后，其历史记录仍保留在该账本中并显示其昵称。</li>
+    <li><strong>服务运营方</strong>：为运行与维护服务，运营方在技术上可访问服务器数据库。</li>
+  </ul>
+
+  <h2>4. 保存期限</h2>
+  <ul>
+    <li>账号与记账数据：在你使用服务期间保存；注销后按运营方策略删除或匿名化。</li>
+    <li>登录会话：默认 30 天，过期自动失效。</li>
+    <li>验证码：10 分钟有效，过期后定期清理。</li>
+    <li>账号注销：当前版本需联系运营方处理（应用内暂未提供自助注销）。</li>
+  </ul>
+
+  <h2>5. 你的权利</h2>
+  <ul>
+    <li>查看与更正：可随时查看记账明细，并修改自己发送的记录。</li>
+    <li>修改资料：可修改昵称、头像，可修改登录密码（修改后其它设备会自动下线）。</li>
+    <li>删除：可删除记录（软删除，可恢复）；如需彻底清除，可联系运营方。</li>
+    <li>数据导出：当前版本暂未提供导出功能。</li>
+  </ul>
+
+  <h2>6. 安全措施</h2>
+  <ul>
+    <li>密码采用 scrypt 加盐哈希存储，服务端不保存明文。</li>
+    <li>所有数据接口都需要登录会话，并按账本隔离——非成员无法读写该账本。</li>
+    <li>建议运营方通过 HTTPS 部署；若使用明文 HTTP，传输过程存在被窃听的风险。</li>
+  </ul>
+
+  <h2>7. 未成年人</h2>
+  <p>若你未满 14 周岁，请在监护人同意并指导下使用本服务。</p>
+
+  <h2>8. 政策变更</h2>
+  <p>政策更新时我们会在应用内提示。重大变更会以更显著的方式告知。</p>
+
+  <h2>9. 联系我们</h2>
+  <p>运营方：【待填写】　隐私联系邮箱：【待填写】</p>
+
+  <div class="foot">
+    <p>本页为产品内置隐私政策模板，内容与当前实现一致（密码哈希、按账本隔离、音频不留存、文本会发送给所配置的模型服务）。正式上线前请由运营方补充主体与联系方式并经法务确认。</p>
+  </div>
+</div>
+</body>
+</html>

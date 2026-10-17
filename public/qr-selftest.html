@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>二维码自检</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #0F1115; color: #E8EAF0; margin: 0; padding: 16px; }
+  h1 { font-size: 16px; }
+  #out { font-size: 13px; line-height: 1.7; }
+  .ok { color: #4ADE80; }
+  .bad { color: #FF6B6B; }
+  .row { display: inline-block; margin: 8px; }
+  .row svg { width: 120px; height: 120px; display: block; }
+  .cap { font-size: 10px; color: #8A90A0; text-align: center; }
+</style>
+</head>
+<body>
+<h1>二维码编码 → 解码 往返验证</h1>
+<div id="out">running…</div>
+<div id="gallery"></div>
+<script type="module">
+import { qrSvg, encodeQr, extractInviteCode } from '/shared/qr.js';
+
+const results = [];
+const report = (label, ok, detail) => {
+  results.push({ label, ok: !!ok, detail });
+  document.title = `QR|${results.length}|${label}`;
+};
+
+/** 直接把编码矩阵画到 canvas（不经过 SVG → Image，避免无头环境下图片加载不回调） */
+function matrixToCanvas(text, scale = 8, quiet = 4) {
+  const { modules, size } = encodeQr(text);
+  const canvas = document.createElement('canvas');
+  const dim = (size + quiet * 2) * scale;
+  canvas.width = dim;
+  canvas.height = dim;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, dim, dim);
+  ctx.fillStyle = '#000';
+  for (let r = 0; r < size; r += 1) {
+    for (let c = 0; c < size; c += 1) {
+      if (modules[r][c]) ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+    }
+  }
+  return canvas;
+}
+
+const PAYLOADS = [
+  '8RFNVDYK',
+  'ABCD2345',
+  'KEEP1234',
+  'keepaccounts://join/8RFNVDYK',
+];
+
+async function main() {
+  const supported = typeof window.BarcodeDetector !== 'undefined';
+  report('浏览器支持 BarcodeDetector', supported);
+  if (!supported) {
+    finish('当前浏览器不支持 BarcodeDetector，无法做解码验证');
+    return;
+  }
+  const formats = await window.BarcodeDetector.getSupportedFormats();
+  report('支持 qr_code 格式', formats.includes('qr_code'), formats.join(','));
+
+  const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+  const gallery = document.getElementById('gallery');
+
+  for (const payload of PAYLOADS) {
+    await new Promise((r) => setTimeout(r, 10));
+    const svg = qrSvg(payload, { scale: 8, quiet: 4 });
+    const box = document.createElement('div');
+    box.className = 'row';
+    box.innerHTML = `${svg}<div class="cap">${payload.slice(0, 18)}</div>`;
+    gallery.append(box);
+
+    try {
+      const canvas = matrixToCanvas(payload, 10);
+      const codes = await detector.detect(canvas);
+      const decoded = codes.length ? codes[0].rawValue : null;
+      report(`解码「${payload}」`, decoded === payload, JSON.stringify({ decoded, version: encodeQr(payload).version }));
+    } catch (err) {
+      report(`解码「${payload}」`, false, String(err && err.message || err));
+    }
+  }
+
+  // 邀请码提取：解码出来的可能是裸码或链接
+  report('从链接提取邀请码', extractInviteCode('keepaccounts://join/8RFNVDYK') === '8RFNVDYK');
+
+  finish();
+}
+
+function finish(extra) {
+  const failed = results.filter((r) => !r.ok);
+  document.documentElement.setAttribute('data-qr-total', String(results.length));
+  document.documentElement.setAttribute('data-qr-failed', String(failed.length));
+  document.documentElement.setAttribute('data-qr', JSON.stringify(results).slice(0, 6000));
+  document.getElementById('out').innerHTML = (failed.length
+    ? `<span class="bad">失败 ${failed.length} / ${results.length}</span>`
+    : `<span class="ok">全部通过 ${results.length} 项 ✅</span>`)
+    + (extra ? `<div class="bad">${extra}</div>` : '')
+    + '<br>' + results.map((r) => `${r.ok ? '✅' : '❌'} ${r.label}${r.detail ? ` <span style="color:#8A90A0">${r.detail}</span>` : ''}`).join('<br>');
+}
+
+main().catch((err) => {
+  report('运行异常', false, String(err && err.stack || err));
+  finish();
+});
+</script>
+</body>
+</html>

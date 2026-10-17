@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive launcher icon. Because minSdk is 26 this single -anydpi-v26 resource is
+  enough for every supported device: no mipmap-mdpi/hdpi/... PNGs required.
+
+  <monochrome> is only read on Android 13+ (themed icons); older platforms skip
+  unknown tags inside <adaptive-icon>, so it is backwards compatible.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

@@ -1,0 +1,48 @@
+# 记账本 · systemd 服务单元
+# 安装：sudo cp deploy/keep-accounts.service /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now keep-accounts
+[Unit]
+Description=记账本 (keep-accounts)
+Documentation=file:///opt/keep-accounts/docs/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=keep
+Group=keep
+WorkingDirectory=/opt/keep-accounts
+
+# 程序自己会读 /opt/keep-accounts/.env（SMTP / 模型 Key / 配额 / PORT 都写在那里）。
+# 这里只钉住几项安全相关的默认值；注意环境变量优先级高于 .env，
+# 想改 HOST 请用 `sudo systemctl edit keep-accounts` 覆盖，而不是改 .env。
+Environment=NODE_ENV=production
+# 只监听本机，由 Nginx / Caddy 对外提供 HTTPS
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+# 生产环境绝不要把验证码回显到接口
+Environment=DEV_SHOW_CODE=false
+
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=keep-accounts
+
+# --- 权限收敛 ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# 只允许写数据目录（SQLite 主库 + WAL）
+ReadWritePaths=/opt/keep-accounts/data
+
+[Install]
+WantedBy=multi-user.target

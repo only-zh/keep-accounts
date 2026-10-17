@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher label. Change to "Keep Accounts" if you want the Latin name. -->
+    <string name="app_name">记账本</string>
+
+    <string name="mic_permission_title">麦克风权限</string>
+    <string name="mic_permission_message">记账需要录制语音，请允许使用麦克风。</string>
+    <string name="allow">允许</string>
+    <string name="deny">拒绝</string>
+</resources>

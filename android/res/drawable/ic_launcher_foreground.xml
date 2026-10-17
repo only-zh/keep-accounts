@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive-icon foreground: a coin resting on a wallet.
+  Vector-only, so the APK needs no binary (PNG) assets at all.
+
+  108x108 viewport = the adaptive-icon "safe zone" is the centre 72x72 (18..90),
+  all artwork below stays inside x:22..86 / y:21..82.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- coin -->
+    <path
+        android:fillColor="#FFD166"
+        android:pathData="M43,32 A11,11 0 1 1 65,32 A11,11 0 1 1 43,32 Z" />
+    <!-- coin inner hole -->
+    <path
+        android:fillColor="#0F1115"
+        android:pathData="M49.5,32 A4.5,4.5 0 1 1 58.5,32 A4.5,4.5 0 1 1 49.5,32 Z" />
+
+    <!-- wallet body (rounded rect 22,44 -> 86,82, r=9) -->
+    <path
+        android:fillColor="#6C8CFF"
+        android:pathData="M31,44 L77,44 A9,9 0 0 1 86,53 L86,73 A9,9 0 0 1 77,82 L31,82 A9,9 0 0 1 22,73 L22,53 A9,9 0 0 1 31,44 Z" />
+
+    <!-- wallet clasp -->
+    <path
+        android:fillColor="#0F1115"
+        android:pathData="M64.5,63 A6.5,6.5 0 1 1 77.5,63 A6.5,6.5 0 1 1 64.5,63 Z" />
+    <path
+        android:fillColor="#A8BCFF"
+        android:pathData="M68,63 A3,3 0 1 1 74,63 A3,3 0 1 1 68,63 Z" />
+</vector>

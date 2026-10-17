@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark shell palette. Keep in sync with MainActivity.BG_COLOR and the web app. -->
+    <color name="background">#FF0F1115</color>
+    <color name="surface">#FF161A21</color>
+    <color name="surface_alt">#FF1E232C</color>
+    <color name="accent">#FF6C8CFF</color>
+    <color name="accent_soft">#336C8CFF</color>
+    <color name="on_background">#FFE6E9EF</color>
+    <color name="on_background_dim">#FF9AA3B2</color>
+    <color name="status_bar">#FF0F1115</color>
+    <color name="navigation_bar">#FF0F1115</color>
+</resources>
