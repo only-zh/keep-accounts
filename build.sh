@@ -22,8 +22,9 @@ set -euo pipefail
 APP_ID="com.keepaccounts.app"
 # 包名转目录路径：com.keepaccounts.app -> com/keepaccounts/app
 APP_ID_PATH="$(printf '%s' "$APP_ID" | tr '.' '/')"
-VERSION_CODE=1
-VERSION_NAME="1.0"
+# 版本号：每次发新版时改这两个（或用环境变量覆盖）
+VERSION_CODE="${KA_VERSION_CODE:-1}"
+VERSION_NAME="${KA_VERSION_NAME:-1.0.0}"
 MIN_SDK=26
 TARGET_SDK=35
 BUILD_TOOLS_VERSION="34.0.0"
@@ -177,10 +178,14 @@ KA_API_BASE="${KA_API_BASE:-}"
 node -e '
   const fs = require("fs");
   const base = (process.env.KA_API_BASE || "").replace(/\/+$/, "");
-  // 前端运行时配置（同源部署时留空）
-  fs.writeFileSync(process.argv[1], "window.__KA_CONFIG__ = " + JSON.stringify({ apiBase: base }) + ";\n");
-  // 原生壳的启动地址：有地址就加载远端 HTTPS 页面（file:// 不是安全上下文，摄像头/麦克风都不可用）
-  fs.writeFileSync(process.argv[2], JSON.stringify({ startUrl: base }, null, 2) + "\n");
+  const versionCode = Number(process.env.KA_VERSION_CODE || 1);
+  const versionName = String(process.env.KA_VERSION_NAME || "1.0.0");
+  // 前端运行时配置：接口地址 + 本包版本号（用于应用内更新比较）
+  fs.writeFileSync(process.argv[1],
+    "window.__KA_CONFIG__ = " + JSON.stringify({ apiBase: base, versionCode, versionName }) + ";\n");
+  // 原生壳读这个拿接口地址
+  fs.writeFileSync(process.argv[2],
+    JSON.stringify({ apiBase: base, versionCode, versionName }, null, 2) + "\n");
 ' "$UI_DIR/config.js" "$ASSETS_DIR/app-config.json"
 if [ -n "$KA_API_BASE" ]; then
     info "接口地址已写入包内配置: $KA_API_BASE"

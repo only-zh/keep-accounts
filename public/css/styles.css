@@ -3007,3 +3007,39 @@ body::after {
 .mention-item .mi-emoji { font-size: 18px; }
 .mention-item .mi-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mention-item .mi-role { font-size: 11px; color: var(--muted); }
+
+/* ---------------- 新版本提示 ---------------- */
+.tab.has-update { position: relative; }
+.tab.has-update::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 50%;
+  margin-right: -14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.dot-badge {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  vertical-align: middle;
+}
+.update-notes {
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #C9CDD8;
+  max-height: 40vh;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}

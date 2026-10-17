@@ -84,6 +84,12 @@ export function loadConfig(envPath = resolve(ROOT, '.env')) {
     devShowCode: get('DEV_SHOW_CODE', 'auto').toLowerCase(),
 
     largeThresholdCents: num('LARGE_THRESHOLD_CENTS', 5000),
+
+    // 应用内更新：APK 版本清单（0 表示不提供更新）
+    appVersionCode: num('APP_VERSION_CODE', 0),
+    appVersionName: get('APP_VERSION_NAME', ''),
+    appUpdateUrl: get('APP_UPDATE_URL', ''),
+    appUpdateNotes: get('APP_UPDATE_NOTES', ''),
     defaultUserName: get('DEFAULT_USER_NAME', '我'),
     defaultBookName: get('DEFAULT_BOOK_NAME', '家庭账本'),
   };

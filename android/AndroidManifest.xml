@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- 扫一扫需要相机；不加这条，WebView 的 getUserMedia(video) 会被系统直接拒绝 -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 应用内更新：安装自己下载的新版本 APK -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- The app is usable without a microphone; do not filter it off tablets. -->
     <uses-feature android:name="android.hardware.microphone" android:required="false" />

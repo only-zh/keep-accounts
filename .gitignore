@@ -20,3 +20,6 @@ android/keystore/
 
 # 系统
 .DS_Store
+
+# 新版本 APK 存放目录（由部署时放入，不进仓库）
+downloads/

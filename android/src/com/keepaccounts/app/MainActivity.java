@@ -3,7 +3,13 @@ package com.keepaccounts.app;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.Uri;
+import android.provider.Settings;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -23,6 +29,7 @@ import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -31,6 +38,8 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.Locale;
 
@@ -51,7 +60,13 @@ public class MainActivity extends Activity {
     private static final String TAG = "KeepAccounts";
 
     /** Bundled UI, staged by build.sh from {@code public/} and {@code shared/}. */
-    private static final String LOCAL_URL = "file:///android_asset/ui/index.html";
+    /**
+     * 内置资源通过 HTTPS 假域名提供（由 shouldInterceptRequest 拦截，不会真的走网络）。
+     * 用 https 而不是 file:// 的原因：file:// 不是安全上下文，
+     * WebView 在那种页面里没有 getUserMedia，摄像头和麦克风都用不了。
+     */
+    private static final String ASSET_ORIGIN = "https://appassets.local";
+    private static final String LOCAL_URL = ASSET_ORIGIN + "/index.html";
     private static final String ASSET_BASE_URL = "file:///android_asset/ui/";
 
     private static final String PREFS = "keep_accounts";
@@ -71,6 +86,8 @@ public class MainActivity extends Activity {
     private static int sRendererRestarts = 0;
 
     private WebView webView;
+    private long updateDownloadId = -1;
+    private DownloadReceiver downloadReceiver;
     private FrameLayout root;
     private NativeHttp nativeHttp;
     private PermissionRequest pendingPermissionRequest;
@@ -144,6 +161,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (downloadReceiver != null) {
+            try { unregisterReceiver(downloadReceiver); } catch (Throwable ignored) { /* already gone */ }
+            downloadReceiver = null;
+        }
         destroyed = true;
         handler.removeCallbacks(reloadRunnable);
 
@@ -234,6 +255,97 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ------------------------------------------------------------------ in-app update
+
+    /** 下载新版本 APK，完成后弹出系统安装界面 */
+    void startApkUpdate(final String url) {
+        if (url == null || url.trim().length() == 0) {
+            showToast("没有可用的下载地址");
+            return;
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                // 需要用户允许「安装未知来源应用」
+                showToast("请允许本应用安装未知来源的应用后重试");
+                Intent settingsIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName()));
+                settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(settingsIntent);
+                return;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "cannot check install permission", t);
+        }
+
+        try {
+            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm == null) {
+                showToast("系统下载服务不可用");
+                return;
+            }
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url.trim()));
+            request.setTitle("记账本更新");
+            request.setDescription("正在下载新版本…");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalFilesDir(this, android.os.Environment.DIRECTORY_DOWNLOADS,
+                    "keep-accounts-update.apk");
+            request.setMimeType("application/vnd.android.package-archive");
+            updateDownloadId = dm.enqueue(request);
+
+            if (downloadReceiver == null) {
+                downloadReceiver = new DownloadReceiver(this);
+                IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+                registerReceiver(downloadReceiver, filter);
+            }
+            showToast("开始下载新版本…");
+        } catch (Throwable t) {
+            Log.e(TAG, "startApkUpdate failed", t);
+            showToast("下载失败：" + t.getMessage());
+        }
+    }
+
+    void onDownloadComplete(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+        if (id != updateDownloadId || id < 0) {
+            return;
+        }
+        try {
+            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            Uri apkUri = (dm == null) ? null : dm.getUriForDownloadedFile(id);
+            if (apkUri == null) {
+                showToast("下载完成但找不到文件");
+                return;
+            }
+            Intent install = new Intent(Intent.ACTION_VIEW);
+            install.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(install);
+        } catch (Throwable t) {
+            Log.e(TAG, "install failed", t);
+            showToast("安装失败：" + t.getMessage());
+        }
+    }
+
+    /** 下载完成的广播接收器（静态内部类，避免 R8 崩溃） */
+    static final class DownloadReceiver extends BroadcastReceiver {
+        private final MainActivity activity;
+
+        DownloadReceiver(MainActivity activity) {
+            this.activity = activity;
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || !DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(intent.getAction())) {
+                return;
+            }
+            activity.onDownloadComplete(intent);
+        }
+    }
+
     // ------------------------------------------------------------------ url handling
 
     /** 用户覆盖过就用它；否则用打包时写进 assets/app-config.json 的地址 */
@@ -251,9 +363,7 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * 读取 build.sh 注入的启动地址。
-     * 正式包加载 https://你的域名 而不是本地 file://——因为 file:// 不是安全上下文，
-     * WebView 在那种页面里既没有 getUserMedia 也没有摄像头能力。
+     * 读取 build.sh 注入的接口地址与版本号。
      */
     private String bakedStartUrl() {
         try (java.io.InputStream in = getAssets().open("app-config.json")) {
@@ -264,7 +374,7 @@ public class MainActivity extends Activity {
                 buf.write(chunk, 0, n);
             }
             String json = buf.toString("UTF-8");
-            String value = new JSONObject(json).optString("startUrl", "");
+            String value = new JSONObject(json).optString("apiBase", "");
             return value == null ? "" : value.trim();
         } catch (Throwable t) {
             Log.i(TAG, "no baked app-config.json (dev build?)");
@@ -287,8 +397,8 @@ public class MainActivity extends Activity {
     }
 
     private String resolveStartUrl() {
-        String server = serverUrl();
-        return (server.length() > 0) ? server : LOCAL_URL;
+        // 页面永远用内置资源（不依赖网络、不读远端 UI），接口地址单独由 config.js 决定
+        return LOCAL_URL;
     }
 
     void loadStartUrl() {
@@ -350,12 +460,14 @@ public class MainActivity extends Activity {
     }
 
     private boolean isConfiguredServer(String url) {
-        String server = serverUrl();
-        if (server.length() == 0) {
+        String urlHost = hostOf(url);
+        if (urlHost == null) {
             return false;
         }
-        String serverHost = hostOf(server);
-        String urlHost = hostOf(url);
+        if ("appassets.local".equalsIgnoreCase(urlHost)) {
+            return true;   // 内置页面
+        }
+        String serverHost = hostOf(serverUrl());
         return serverHost != null && serverHost.equalsIgnoreCase(urlHost);
     }
 
@@ -645,6 +757,21 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static String mimeOf(String path) {
+        String p = path.toLowerCase(Locale.US);
+        if (p.endsWith(".html") || p.endsWith("/")) return "text/html";
+        if (p.endsWith(".js") || p.endsWith(".mjs")) return "application/javascript";
+        if (p.endsWith(".css")) return "text/css";
+        if (p.endsWith(".json") || p.endsWith(".webmanifest")) return "application/json";
+        if (p.endsWith(".svg")) return "image/svg+xml";
+        if (p.endsWith(".png")) return "image/png";
+        if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+        if (p.endsWith(".ico")) return "image/x-icon";
+        if (p.endsWith(".woff2")) return "font/woff2";
+        if (p.endsWith(".txt")) return "text/plain";
+        return "application/octet-stream";
+    }
+
     private static final class AppWebViewClient extends WebViewClient {
 
         private final MainActivity activity;
@@ -680,6 +807,30 @@ public class MainActivity extends Activity {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
             return activity.handleNavigation(url);
+        }
+
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            if (request == null) {
+                return null;
+            }
+            Uri uri = request.getUrl();
+            if (uri == null || !"appassets.local".equalsIgnoreCase(uri.getHost())) {
+                return null;   // 其它域名走正常网络
+            }
+            String path = uri.getPath();
+            if (path == null || path.length() == 0 || "/".equals(path)) {
+                path = "/index.html";
+            }
+            String assetPath = "ui" + path;
+            try {
+                InputStream in = activity.getAssets().open(assetPath);
+                return new WebResourceResponse(mimeOf(assetPath), "utf-8", in);
+            } catch (Throwable t) {
+                Log.w(TAG, "asset missing: " + assetPath);
+                return new WebResourceResponse("text/plain", "utf-8",
+                        new ByteArrayInputStream("Not found".getBytes()));
+            }
         }
 
         @Override

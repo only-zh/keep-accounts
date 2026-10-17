@@ -519,6 +519,18 @@ async function handleApi(req, res, url) {
   if (p === '/api/health') return ok(res, { status: 'ok', serverTime: nowIso(), schemaVersion: SCHEMA_VERSION });
   if (p === '/api/config') return ok(res, configPayload());
 
+  // 应用内更新清单（公开，登录前也能查）
+  if (p === '/api/app-version' && method === 'GET') {
+    const declared = Number(cfg.appVersionCode) || 0;
+    const fallbackUrl = `https://${req.headers.host || ''}/download/keep-accounts.apk`;
+    return ok(res, {
+      versionCode: declared,
+      versionName: cfg.appVersionName || '',
+      url: cfg.appUpdateUrl || (declared > 0 ? fallbackUrl : ''),
+      notes: cfg.appUpdateNotes || '',
+    });
+  }
+
   // 可选的额外接口口令（私有部署用，和账号体系叠加）
   if (cfg.authToken && req.headers['x-auth-token'] !== cfg.authToken) {
     return fail(res, 401, '访问口令不正确', 'AUTH');
@@ -541,6 +553,38 @@ async function handleApi(req, res, url) {
 /* ------------------------------------------------------------------ *
  * 静态资源
  * ------------------------------------------------------------------ */
+
+/**
+ * 下载目录：新版本 APK 放这里（/opt/keep-accounts/downloads/keep-accounts.apk）。
+ * 单独一个目录，避免把 APK 打进 Web 资源或 APK 自身。
+ */
+async function serveDownload(req, res, url) {
+  const sub = decodeURIComponent(url.pathname).replace(/^\/download\//, '');
+  if (!sub || sub.includes('..')) {
+    return send(res, 404, { ok: false, error: '资源不存在' });
+  }
+  const dir = join(ROOT, 'downloads');
+  const target = resolve(join(dir, sub));
+  if (target !== dir && !target.startsWith(dir + sep)) {
+    return send(res, 403, { ok: false, error: '禁止访问' });
+  }
+  try {
+    const st = await stat(target);
+    if (!st.isFile()) throw new Error('not a file');
+    res.writeHead(200, {
+      'Content-Type': extname(target).toLowerCase() === '.apk'
+        ? 'application/vnd.android.package-archive'
+        : (MIME[extname(target).toLowerCase()] || 'application/octet-stream'),
+      'Content-Length': st.size,
+      'Cache-Control': 'no-cache',
+      'Content-Disposition': `attachment; filename="${sub.split('/').pop()}"`,
+    });
+    if (req.method === 'HEAD') return res.end();
+    return res.end(await readFile(target));
+  } catch {
+    return send(res, 404, { ok: false, error: '资源不存在' });
+  }
+}
 
 async function serveStatic(req, res, url) {
   let rel = decodeURIComponent(url.pathname);
@@ -587,6 +631,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+    if (url.pathname.startsWith('/download/')) return await serveDownload(req, res, url);
     return await serveStatic(req, res, url);
   } catch (err) {
     const status = err instanceof HttpError ? err.status : 500;

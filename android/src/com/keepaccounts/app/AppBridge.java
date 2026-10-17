@@ -46,6 +46,12 @@ public final class AppBridge {
         activity.reloadApp();
     }
 
+    /** 应用内更新：下载并安装新版本 APK */
+    @JavascriptInterface
+    public void installUpdate(String url) {
+        activity.startApkUpdate(url);
+    }
+
     @JavascriptInterface
     public void reload() {
         activity.reloadApp();

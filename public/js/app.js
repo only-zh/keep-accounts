@@ -584,13 +584,26 @@ function renderSettings() {
 
 /** 版本行：点击看版本；长按 800ms 进入内部调试（接口地址覆盖），普通用户不会触发 */
 function versionItem() {
+  const avail = store.update;
   const row = el('div', { class: 'settings-item', role: 'button', tabindex: '0' }, [
     el('div', { class: 'si-main' }, [
-      el('div', { text: '版本' }),
-      el('div', { class: 'si-value', text: '2.0.0' }),
+      el('div', {}, [
+        document.createTextNode('版本'),
+        avail ? el('span', { class: 'dot-badge' }) : null,
+      ]),
+      el('div', {
+        class: 'si-value',
+        text: avail
+          ? `发现新版本 ${avail.versionName || avail.versionCode}`
+          : (window.__KA_CONFIG__ && window.__KA_CONFIG__.versionName) || '2.0.0',
+      }),
     ]),
     el('span', { class: 'chev', text: '›' }),
   ]);
+  row.addEventListener('click', () => {
+    if (store.update) openUpdateSheet();
+    else toast(`已是最新版本 ${(window.__KA_CONFIG__ && window.__KA_CONFIG__.versionName) || ''}`.trim());
+  });
   let timer = null;
   const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
   row.addEventListener('pointerdown', () => {
@@ -602,6 +615,52 @@ function versionItem() {
   row.addEventListener('pointercancel', clearTimer);
   row.addEventListener('click', () => { if (!timer) toast('记账本 2.0.0'); });
   return row;
+}
+
+function openUpdateSheet() {
+  const info = store.update;
+  openSheet((body, close) => {
+    body.append(el('h3', { text: info ? `新版本 ${info.versionName || info.versionCode}` : '检查更新' }));
+    if (!info) {
+      body.append(el('p', { class: 'quota-line', text: '当前已经是最新版本。' }));
+      body.append(el('div', { class: 'sheet-actions' }, [
+        el('button', { class: 'primary', type: 'button', text: '知道了', onclick: close }),
+      ]));
+      return;
+    }
+    body.append(el('p', { class: 'quota-line', text: `当前版本 ${info.mine} → 新版本 ${info.versionCode}` }));
+    if (info.notes) {
+      body.append(el('div', { class: 'update-notes' }, String(info.notes).split('\n').map((line) => el('div', { text: line }))));
+    }
+    body.append(el('div', { class: 'sheet-actions' }, [
+      el('button', { class: 'primary', type: 'button', text: '立即更新', onclick: () => {
+        const bridge = window.NativeApp;
+        if (bridge && typeof bridge.installUpdate === 'function') {
+          bridge.installUpdate(info.url);
+          close();
+          toast('开始下载新版本…');
+        } else {
+          // 浏览器里直接下载，装完会覆盖升级
+          window.location.href = info.url;
+        }
+      } }),
+    ]));
+  });
+}
+
+/** 启动时检查更新：有新版本就弹一次 */
+async function checkUpdateOnLaunch() {
+  try {
+    const info = await store.checkAppVersion();
+    renderSettingsTabDot();
+    if (info) setTimeout(() => openUpdateSheet(), 600);
+  } catch { /* 忽略 */ }
+}
+
+function renderSettingsTabDot() {
+  const btn = $('#tabSettings');
+  if (!btn) return;
+  btn.classList.toggle('has-update', !!store.update);
 }
 
 function openAvatarSheet() {
@@ -2166,6 +2225,7 @@ async function boot() {
 
   enterApp();
   try { history.replaceState({ page: 'books' }, ''); } catch { /* ignore */ }
+  checkUpdateOnLaunch();
   if (new URLSearchParams(location.search).get('view') === 'detail') navigate('detail');
 
   store.onChange(() => {

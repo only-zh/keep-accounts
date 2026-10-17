@@ -40,6 +40,7 @@ export class Store {
     this.role = null;
     this.members = [];
     this.authors = [];   // 记录里出现过的账号（含已移出的成员）
+    this.update = null;  // 可用的新版本信息
     this.records = [];
     this.messages = [];
     this.failed = [];
@@ -196,6 +197,7 @@ export class Store {
     this.books = [];
     this.members = [];
     this.authors = [];   // 记录里出现过的账号（含已移出的成员）
+    this.update = null;  // 可用的新版本信息
     this.records = [];
     this.messages = [];
     this.failed = [];
@@ -445,6 +447,26 @@ export class Store {
     if (Number(record.authorAccountId) === me) return true;   // 自己发的
     if (Number(record.payerAccountId) === me) return true;    // 别人帮我记的（@我）
     return this.isManager;
+  }
+
+  /** 查询是否有新版本（比较服务端清单与本包内置的 versionCode） */
+  async checkAppVersion() {
+    const mine = Number((typeof window !== 'undefined' && window.__KA_CONFIG__
+      && window.__KA_CONFIG__.versionCode) || 0);
+    // 只有装在手机上的 APK（带 versionCode）才需要更新提示；浏览器访问不打扰
+    if (!mine) return null;
+    try {
+      const info = await this.apiRaw('/api/app-version');
+      const code = Number(info && info.versionCode) || 0;
+      const available = code > mine && !!(info && info.url);
+      this.update = available
+        ? { versionCode: code, versionName: info.versionName || '', url: info.url, notes: info.notes || '', mine }
+        : null;
+      this.emit();
+      return this.update;
+    } catch {
+      return null;
+    }
   }
 
   /** 标记本账本已读（清掉「有人@我」） */

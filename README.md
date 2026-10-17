@@ -166,6 +166,37 @@ sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
 KA_API_BASE=https://你的域名 bash build.sh
 ```
 
+## 7.1 应用内更新
+
+APK **不读取远端页面**：界面资源打在包里，通过 `https://appassets.local`（由 WebView 拦截，不会真的联网）
+提供给页面，这样既能离线打开、又满足"安全上下文"要求（摄像头/麦克风才可用）。
+
+更新流程：
+
+```bash
+# 1) 开发机：改版本号后重新打包
+KA_API_BASE=https://你的域名 KA_VERSION_CODE=3 KA_VERSION_NAME=1.0.2 bash build.sh
+
+# 2) 把新包传到服务器
+scp dist/keep-accounts.apk keep@SERVER:/opt/keep-accounts/downloads/keep-accounts.apk
+
+# 3) 服务器：声明新版本
+sudo -u keep nano /opt/keep-accounts/.env
+#   APP_VERSION_CODE=3
+#   APP_VERSION_NAME=1.0.2
+#   APP_UPDATE_NOTES=修复语音卡死
+#                    新增 @ 提醒
+sudo systemctl restart keep-accounts
+```
+
+手机上打开 App 会：
+
+- 启动时检查 `/api/app-version`，有新版本自动弹更新面板（含更新说明）；
+- 设置页「版本」右侧显示「发现新版本 x.y.z」并带红点，**底部「设置」tab 也有红点**；
+- 点「立即更新」→ 系统下载 APK → 弹出安装界面（需允许"安装未知来源应用"）。
+
+`APP_VERSION_CODE=0`（默认）表示不提供更新，App 不会提示。
+
 ## 8. 打包成 APK
 
 不需要 Gradle / AndroidX：手写 WebView 壳 + `aapt2/d8/apksigner` 构建。
