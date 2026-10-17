@@ -59,6 +59,11 @@ fi
 
 echo
 echo "3. 数据目录"
+# DB_PATH 可能是相对路径（如 ./data/ledger.db），按安装目录解析，而不是当前工作目录
+case "$DB_PATH" in
+  /*) : ;;
+  *) DB_PATH="${APP_DIR}/${DB_PATH#./}" ;;
+esac
 DB_DIR="$(dirname "$DB_PATH")"
 if [ -d "$DB_DIR" ]; then
   if [ -w "$DB_DIR" ]; then ok "可写: $DB_DIR"; else bad "不可写: $DB_DIR（sudo chown -R keep:keep \"$DB_DIR\"）"; fi

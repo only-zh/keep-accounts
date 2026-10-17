@@ -44,7 +44,7 @@ export function loadConfig(envPath = resolve(ROOT, '.env')) {
     envPath,
     port: num('PORT', 8787),
     host: get('HOST', '0.0.0.0'),
-    dbPath: get('DB_PATH', './data/ledger.db'),
+    dbPath: resolve(ROOT, get('DB_PATH', './data/ledger.db')),
     tz: get('TZ', 'Asia/Shanghai'),
     authToken: get('AUTH_TOKEN', ''),
 
