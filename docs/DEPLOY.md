@@ -286,6 +286,74 @@ sudo systemctl restart keep-accounts
 
 ---
 
+## 8.1 没有域名怎么办
+
+三条路，按推荐顺序：
+
+### A. 用 sslip.io 拿免费域名 + 真证书（推荐）
+
+`sslip.io` 提供「把 IP 写进域名」的公共 DNS：IP 是 `203.0.113.5`，域名就是 `203-0-113-5.sslip.io`。
+它直接解析回你的 IP，因此可以正常申请 Let's Encrypt 证书——**不需要买域名，也不需要备案**。
+
+```bash
+# 0) 先确认解析对了（应返回你的公网 IP）
+dig +short 203-0-113-5.sslip.io
+
+# 1) 安全组放行 80/443（证书签发需要 80）
+
+# 2) 用 sslip.io 的域名写 Caddyfile
+sudo cp /opt/keep-accounts/deploy/Caddyfile /etc/caddy/Caddyfile
+sudo sed -i 's/ledger.example.com/203-0-113-5.sslip.io/' /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+sudo journalctl -u caddy -n 30 --no-pager     # 看证书是否签发成功
+
+# 3) 验证
+curl -I https://203-0-113-5.sslip.io          # 期望 200
+
+# 4) 打 APK
+KA_API_BASE=https://203-0-113-5.sslip.io bash build.sh
+```
+
+注意：
+
+- 域名绑的是**当前公网 IP**，如果释放/更换了 EIP，域名和证书都要换，APK 也要重打。建议用固定 EIP。
+- 证书签发失败时，看 `journalctl -u caddy`：多半是 80 端口没通或 DNS 还没生效。
+
+### B. Cloudflare Quick Tunnel（连端口都不用开）
+
+适合临时试用：不需要域名、不需要放行端口，由 Cloudflare 中转。
+
+```bash
+curl -L -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+chmod +x /tmp/cloudflared && sudo mv /tmp/cloudflared /usr/local/bin/
+cloudflared tunnel --url http://127.0.0.1:8787
+# 输出里会给一个 https://xxx-xxx.trycloudflare.com
+```
+
+限制：URL 每次重启都变（要长期用需要 Cloudflare 账号 + 域名）、流量经过 Cloudflare。
+
+### C. 直接用 IP + 端口（只建议内测）
+
+```bash
+sudo systemctl edit keep-accounts
+#   [Service]
+#   Environment=HOST=0.0.0.0
+sudo systemctl restart keep-accounts
+```
+
+安全组放行 8787，APK 用 `KA_API_BASE=http://公网IP:8787`。
+
+⚠️ **明文 HTTP**：登录密码和会话 token 在公网上裸奔。只适合你自己在可信网络里试，
+给家人用之前务必换成 A 或 B。
+
+### D. 以后买了域名怎么切
+
+1. 域名 A 记录指向同一台机器；
+2. Caddyfile 里的 host 换成新域名，`sudo systemctl reload caddy`；
+3. 重新打包 APK（`KA_API_BASE=https://新域名`），让家人重装。
+
+数据完全不受影响——它一直在服务器上。
+
 ## 9. 打包 APK 指向你的域名
 
 APK 里**没有**服务器设置项，地址是打包时写死的：
