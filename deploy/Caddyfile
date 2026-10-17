@@ -1,24 +1,21 @@
-# 记账本 · Caddy 反向代理（更省事：自动申请并续期 HTTPS 证书）
-# 用法：sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
-# 前提：把域名 A 记录指向服务器，并且 80/443 已在安全组放行
+# 记账本 · Caddy 反向代理（自动申请并续期 HTTPS 证书）
 #
-# 国内服务器：用域名走 80/443 需要 ICP 备案；未备案时请用 http://IP:8787 直连，
-# 或把站点改为 http://:8788 之类的非标端口（但不建议，登录凭证会明文传输）。
+# 用法：
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo sed -i 's/ledger.example.com/你的域名/' /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy && sudo journalctl -u caddy -n 30 --no-pager
+#
+# 没有域名时可以用 sslip.io：把 IP 的 . 换成 -，例如
+#   69-5-20-115.sslip.io   （解析结果就是 69.5.20.115）
+#
+# 这里刻意只用了 Caddy 2.4 以来都稳定的指令，避免版本差异导致启动失败。
 
 ledger.example.com {
 	encode zstd gzip
 
 	reverse_proxy 127.0.0.1:8787 {
-		# 大模型解析 + 语音上传：放宽超时与体积
-		transport http {
-			read_timeout 120s
-			write_timeout 120s
-		}
+		# 让聊天里的流式响应不被缓冲
 		flush_interval -1
-	}
-
-	request_body {
-		max_size 30MB
 	}
 
 	header {

@@ -297,21 +297,21 @@ sudo systemctl restart keep-accounts
 
 ```bash
 # 0) 先确认解析对了（应返回你的公网 IP）
-dig +short 203-0-113-5.sslip.io
+dig +short 69-5-20-115.sslip.io     # 换成你自己的 IP（. → -）
 
 # 1) 安全组放行 80/443（证书签发需要 80）
 
 # 2) 用 sslip.io 的域名写 Caddyfile
 sudo cp /opt/keep-accounts/deploy/Caddyfile /etc/caddy/Caddyfile
-sudo sed -i 's/ledger.example.com/203-0-113-5.sslip.io/' /etc/caddy/Caddyfile
+sudo sed -i 's/ledger.example.com/69-5-20-115.sslip.io/' /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 sudo journalctl -u caddy -n 30 --no-pager     # 看证书是否签发成功
 
 # 3) 验证
-curl -I https://203-0-113-5.sslip.io          # 期望 200
+curl -I https://69-5-20-115.sslip.io          # 期望 200
 
 # 4) 打 APK
-KA_API_BASE=https://203-0-113-5.sslip.io bash build.sh
+KA_API_BASE=https://69-5-20-115.sslip.io bash build.sh
 ```
 
 注意：
