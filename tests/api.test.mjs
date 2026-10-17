@@ -452,6 +452,58 @@ try {
     eq(kickAdmin.status, 403, '管理员不能移出另一个管理员');
   }
 
+  /* ============ I5. @ 帮别人记账：被@者可改 + @我 未读提醒 ============ */
+  {
+    // 上一步把「老婆」设成了 admin，这里让管理员用 @ 帮第 3 位成员记账
+    const target = members[2 - 1];   // members[1] 已被移出，用 members[0]=wife 之外的在册成员
+    const helper = members[0];       // wife（admin）
+    const before = await api(`/api/bootstrap?bookId=${bookId}`, { token: helper.token });
+    const victim = (before.data.members || []).find((m) => m.accountId !== helper.account.id
+      && m.accountId !== owner.account.id && !m.left);
+
+    const res = await api('/api/messages', {
+      method: 'POST',
+      token: helper.token,
+      body: { text: `@${victim.displayName} 买菜 30`, bookId },
+    });
+    eq(res.status, 200, '@ 帮别人记账成功');
+    const rec = res.data.reply.records[0];
+    eq(rec.payerAccountId, victim.accountId, '付款人记在被@的人名下');
+    eq(rec.authorAccountId, helper.account.id, '作者是帮忙记账的管理员');
+
+    // 被 @ 的人自己可以改这条（即使不是作者、也不是管理员）
+    const targetToken = (await api('/api/auth/login', {
+      method: 'POST', body: { email: victim.email, password: 'Passw0rd123' },
+    })).data.token;
+    const patched = await api(`/api/records/${rec.id}`, {
+      method: 'PATCH', token: targetToken, body: { patch: { amountCents: 3300 }, version: rec.version },
+    });
+    eq(patched.status, 200, '被@的人可以修改别人帮自己记的账');
+
+    // 但不是「被@」也不是作者的普通成员仍然不能改
+    const other = (before.data.members || []).find((m) => m.role === 'member'
+      && m.accountId !== victim.accountId && m.accountId !== owner.account.id);
+    if (other) {
+      const otherToken = (await api('/api/auth/login', {
+        method: 'POST', body: { email: other.email, password: 'Passw0rd123' },
+      })).data.token;
+      const denied = await api(`/api/records/${rec.id}`, {
+        method: 'PATCH', token: otherToken, body: { patch: { amountCents: 1 }, version: patched.data.record.version },
+      });
+      eq(denied.status, 403, '无关成员仍然不能改别人的记录');
+    }
+
+    // @我 未读提醒
+    const books = await api('/api/books', { token: targetToken });
+    const b = books.data.books.find((x) => x.id === bookId);
+    ok(b.unreadMentions >= 1, '被@的人在账本列表看到未读 @ 提醒');
+
+    const read = await api(`/api/books/${bookId}/read`, { method: 'POST', token: targetToken });
+    eq(read.status, 200, '标记已读成功');
+    const again = await api('/api/books', { token: targetToken });
+    eq(again.data.books.find((x) => x.id === bookId).unreadMentions, 0, '已读后未读 @ 清零');
+  }
+
   /* ============ J. 验证码限流 ============ */
   {
     const email = `limit_${stamp}@test.com`;

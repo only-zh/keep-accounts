@@ -177,8 +177,11 @@ KA_API_BASE="${KA_API_BASE:-}"
 node -e '
   const fs = require("fs");
   const base = (process.env.KA_API_BASE || "").replace(/\/+$/, "");
+  // 前端运行时配置（同源部署时留空）
   fs.writeFileSync(process.argv[1], "window.__KA_CONFIG__ = " + JSON.stringify({ apiBase: base }) + ";\n");
-' "$UI_DIR/config.js"
+  // 原生壳的启动地址：有地址就加载远端 HTTPS 页面（file:// 不是安全上下文，摄像头/麦克风都不可用）
+  fs.writeFileSync(process.argv[2], JSON.stringify({ startUrl: base }, null, 2) + "\n");
+' "$UI_DIR/config.js" "$ASSETS_DIR/app-config.json"
 if [ -n "$KA_API_BASE" ]; then
     info "接口地址已写入包内配置: $KA_API_BASE"
 else

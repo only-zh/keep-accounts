@@ -235,6 +235,13 @@ async function handleBookRoutes(req, res, url, method) {
     return ok(res, { book: store.updateBook(m[1], account.id, body) });
   }
 
+  m = p.match(/^\/api\/books\/(\d+)\/read$/);
+  if (m && method === 'POST') {
+    const { account } = requireAuth(req);
+    const book = store.assertMember(m[1], account.id);
+    return ok(res, { ...store.touchRead(book.bookId || m[1], account.id), bookId: Number(m[1]) });
+  }
+
   m = p.match(/^\/api\/books\/(\d+)\/members$/);
   if (m && method === 'GET') {
     const { account } = requireAuth(req);
@@ -368,10 +375,16 @@ async function handleDataRoutes(req, res, url, method) {
       cfg: { tz: cfg.tz, model: cfg.deepseekModel, largeThresholdCents: store.largeThresholdCents },
     });
 
+    // 被 @ 到 / 被帮记账的人：记一条提醒（排除记账人自己）
+    const mentionIds = [...new Set((reply.records || [])
+      .map((r) => Number(r.payerAccountId))
+      .filter((id) => Number.isFinite(id) && id !== Number(account.id)))];
+
     const assistantMessage = store.insertMessage({
       bookId: book.id, authorAccountId: null, role: 'assistant',
       kind: reply.action === 'created' ? 'record' : reply.action,
       content: reply.text || '',
+      mentions: mentionIds,
       payload: {
         engine: reply.engine,
         warnings: reply.warnings,
@@ -381,6 +394,7 @@ async function handleDataRoutes(req, res, url, method) {
         clarification: reply.clarification,
         query: reply.query,
         summary: reply.summary,
+        mentions: mentionIds,
       },
     });
 

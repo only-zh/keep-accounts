@@ -1,10 +1,11 @@
 /* ==========================================================================
  * stats.css —— 统计页样式（stats-page.js 专用，全部选择器使用 st- 前缀）
  *
+ * 主题：一二 & 布布（奶油纸 + 草莓粉 + 可可棕）
  * 约定：
- *  1. 深色优先，颜色一律读应用的 CSS 变量，并带安全回退值；
- *  2. 移动端优先：单列 → ≥760px 双列 / 四列；不允许出现整页横向滚动；
- *  3. 所有可点元素触控高度 ≥ 40px；底部留 safe-area 内边距；
+ *  1. 颜色一律读应用的 CSS 变量，并带安全回退值；
+ *  2. 移动端优先：单列 → ≥760px 双列 / 四列；不允许整页横向滚动；
+ *  3. 可点元素触控高度 ≥ 40px；底部留 safe-area 内边距；
  *  4. 数字统一 tabular-nums，避免跳动。
  * ========================================================================== */
 
@@ -13,18 +14,18 @@
  * -------------------------------------------------------------------------- */
 
 .st-page {
-  --st-radius: 14px;
-  --st-radius-sm: 10px;
-  --st-up: #FF6B6B;      /* 支出上涨 / 结余为负 */
-  --st-down: #3FD0A4;    /* 支出下降 / 结余为正 */
+  --st-radius: 20px;
+  --st-radius-sm: 12px;
+  --st-up: #E8607E;      /* 支出上涨 / 结余为负 */
+  --st-down: #33886A;    /* 支出下降 / 结余为正 */
   box-sizing: border-box;
   max-width: 100%;
-  overflow-x: clip;                 /* 兜底：不允许横向拖动整页（不产生滚动容器） */
-  color-scheme: dark;               /* 原生日期选择器 / 数字步进器跟随深色 */
-  color: var(--text, #E8EAF0);
+  overflow-x: clip;
+  color-scheme: light;
+  color: var(--text, #5B4038);
   font-variant-numeric: tabular-nums;
   -webkit-tap-highlight-color: transparent;
-  padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 12px calc(26px + env(safe-area-inset-bottom, 0px));
 }
 
 .st-page *,
@@ -33,9 +34,7 @@
   box-sizing: border-box;
 }
 
-.st-page > * {
-  min-width: 0;
-}
+.st-page > * { min-width: 0; }
 
 .st-page button {
   font: inherit;
@@ -44,13 +43,11 @@
 }
 
 .st-page :focus-visible {
-  outline: 2px solid var(--brand, #6C8CFF);
+  outline: 2px solid var(--brand, #FF8FAB);
   outline-offset: 2px;
 }
 
-.is-hidden {
-  display: none !important;
-}
+.is-hidden { display: none !important; }
 
 /* --------------------------------------------------------------------------
  * §1 面板（范围 / 筛选外壳）
@@ -59,15 +56,18 @@
 .st-panel,
 .st-card {
   min-width: 0;
-  background: var(--card, #171A21);
-  border: 1px solid var(--border, #242833);
+  background: var(--card, #FFFDF9);
+  border: 1.5px solid var(--border, #F1DFD1);
   border-radius: var(--st-radius);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(91, 64, 56, 0.05));
 }
 
 .st-panel {
-  padding: 12px;
+  padding: 14px;
   margin-bottom: 12px;
+  background:
+    radial-gradient(110% 100% at 100% 0%, rgba(255, 233, 240, 0.55) 0%, rgba(255, 233, 240, 0) 58%),
+    var(--card, #FFFDF9);
 }
 
 .st-panel__head,
@@ -79,35 +79,41 @@
   flex-wrap: wrap;
 }
 
-.st-panel__head {
-  margin-bottom: 8px;
-}
+.st-panel__head { margin-bottom: 9px; }
 
 .st-panel__title,
 .st-card__title {
   margin: 0;
-  font-weight: 600;
-  color: var(--text, #E8EAF0);
+  font-weight: 700;
+  color: var(--ink, #5B4038);
 }
 
 .st-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: 13px;
 }
 
-.st-card__title {
-  font-size: 14px;
+.st-panel__title::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand, #FF8FAB);
+  box-shadow: 0 0 0 4px var(--brand-soft, #FFE4EB);
 }
+
+.st-card__title { font-size: 14.5px; }
 
 .st-range-resolved,
 .st-card__hint {
   font-size: 12px;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
   font-variant-numeric: tabular-nums;
 }
 
-.st-card__hint {
-  white-space: nowrap;
-}
+.st-card__hint { white-space: nowrap; }
 
 /* --------------------------------------------------------------------------
  * §2 chip（范围 / 成员 / 类别 / 类型 / 仅看大额）与横向滚动行
@@ -127,9 +133,7 @@
 }
 
 .st-chips::-webkit-scrollbar,
-.st-scroll::-webkit-scrollbar {
-  display: none;
-}
+.st-scroll::-webkit-scrollbar { display: none; }
 
 .st-chip {
   flex: 0 0 auto;
@@ -137,37 +141,32 @@
   align-items: center;
   gap: 5px;
   min-height: 40px;
-  padding: 0 13px;
-  border: 1px solid var(--border, #242833);
+  padding: 0 14px;
+  border: 1.5px solid var(--border, #F1DFD1);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text, #E8EAF0);
+  background: var(--bg-soft, #FFF1E4);
+  color: var(--text-soft, #7C5B50);
   font-size: 13px;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  transition: transform 0.2s cubic-bezier(0.22, 1.35, 0.36, 1),
+    background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.st-chip:active {
-  background: rgba(255, 255, 255, 0.09);
-}
+.st-chip:active { transform: scale(0.94); }
 
 .st-chip.is-active {
-  background: rgba(108, 140, 255, 0.18);
-  border-color: var(--brand, #6C8CFF);
-  color: var(--brand, #6C8CFF);
-  font-weight: 600;
+  background: linear-gradient(140deg, #FFAEC4, #FF8FAB);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 8px 16px -11px rgba(242, 113, 147, 0.95), 0 1px 0 rgba(255, 255, 255, 0.45) inset;
 }
 
-.st-chip__emoji {
-  font-size: 14px;
-  line-height: 1;
-}
-
-.st-chip__text {
-  white-space: nowrap;
-}
+.st-chip__emoji { font-size: 14px; line-height: 1; }
+.st-chip__text { white-space: nowrap; }
 
 /* --------------------------------------------------------------------------
  * §3 自定义区间 / 输入框 / 按钮
@@ -178,41 +177,38 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border, #242833);
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border-strong, #E7CEBC);
 }
 
-.st-custom__sep {
-  color: var(--muted, #8A90A0);
-  font-size: 13px;
-}
+.st-custom__sep { color: var(--muted-2, #C2A594); font-size: 13px; }
 
 .st-date,
 .st-input {
   min-height: 40px;
   min-width: 0;
-  padding: 0 10px;
-  border: 1px solid var(--border, #242833);
+  padding: 0 11px;
+  border: 1.5px solid var(--border, #F1DFD1);
   border-radius: var(--st-radius-sm);
-  background: var(--bg, #0F1115);
-  color: var(--text, #E8EAF0);
+  background: var(--bg-soft, #FFF1E4);
+  color: var(--text, #5B4038);
   font-size: 14px;
   font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
 
-.st-date {
-  flex: 1 1 128px;
-}
+.st-date { flex: 1 1 128px; }
 
 .st-input:focus,
 .st-date:focus {
-  border-color: var(--brand, #6C8CFF);
+  border-color: #FFC3D2;
+  background: var(--card, #FFFDF9);
+  box-shadow: 0 0 0 3px rgba(255, 143, 171, 0.12);
 }
 
-.st-input::placeholder {
-  color: var(--muted, #8A90A0);
-}
+.st-input::placeholder { color: var(--muted-2, #C2A594); }
 
 .st-btn {
   display: inline-flex;
@@ -220,45 +216,46 @@
   justify-content: center;
   gap: 6px;
   min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid var(--border, #242833);
+  padding: 0 15px;
+  border: 1.5px solid var(--border, #F1DFD1);
   border-radius: var(--st-radius-sm);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text, #E8EAF0);
+  background: var(--card, #FFFDF9);
+  color: var(--text, #5B4038);
   font-size: 13px;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  transition: transform 0.18s cubic-bezier(0.22, 1.35, 0.36, 1),
+    background-color 0.18s ease, border-color 0.18s ease;
 }
 
-.st-btn:active {
-  background: rgba(255, 255, 255, 0.1);
-}
+.st-btn:active { transform: scale(0.96); }
 
 .st-btn--primary {
-  background: rgba(108, 140, 255, 0.2);
-  border-color: var(--brand, #6C8CFF);
-  color: var(--brand, #6C8CFF);
-  font-weight: 600;
+  background: linear-gradient(140deg, #FFAEC4, #FF8FAB);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 8px 16px -12px rgba(242, 113, 147, 0.9);
 }
 
 .st-btn--ghost {
   background: transparent;
+  border-style: dashed;
 }
 
 /* --------------------------------------------------------------------------
  * §4 筛选区
  * -------------------------------------------------------------------------- */
 
-.st-filter-group + .st-filter-group {
-  margin-top: 10px;
-}
+.st-filter-group + .st-filter-group { margin-top: 11px; }
 
 .st-filter-label {
   margin-bottom: 6px;
   font-size: 12px;
-  color: var(--muted, #8A90A0);
+  font-weight: 600;
+  color: var(--muted, #A28170);
 }
 
 .st-filter-row {
@@ -284,9 +281,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.st-input--kw {
-  flex: 1 1 190px;
-}
+.st-input--kw { flex: 1 1 190px; }
 
 .st-filter-actions {
   display: flex;
@@ -294,36 +289,29 @@
   align-items: center;
   gap: 8px;
   margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border, #242833);
+  padding-top: 11px;
+  border-top: 1px dashed var(--border-strong, #E7CEBC);
 }
 
 /* --------------------------------------------------------------------------
  * §5 结果区 / 概览行
  * -------------------------------------------------------------------------- */
 
-.st-results {
-  min-width: 0;
-}
+.st-results { min-width: 0; }
 
 .st-summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 0 2px 8px;
+  padding: 0 3px 9px;
   font-size: 12px;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
 }
 
-.st-summary__range {
-  font-variant-numeric: tabular-nums;
-}
-
+.st-summary__range { font-variant-numeric: tabular-nums; }
 .st-summary__sep,
-.st-metric__sep {
-  color: var(--grid, #2A2F3A);
-}
+.st-metric__sep { color: var(--border-strong, #E7CEBC); }
 
 /* --------------------------------------------------------------------------
  * §6 指标卡（手机 2 列，宽屏 4 列；宽卡横跨 2 列）
@@ -338,40 +326,56 @@
 
 .st-metric {
   min-width: 0;
-  padding: 12px;
-  background: var(--card, #171A21);
-  border: 1px solid var(--border, #242833);
+  padding: 13px;
+  background: linear-gradient(145deg, #FFF6FA, #FFFDF9);
+  border: 1.5px solid #FFE3EB;
   border-radius: var(--st-radius);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 2px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 24px -20px rgba(91, 64, 56, 0.5);
+  animation: stRise 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
 }
 
-.st-metric--wide {
-  grid-column: 1 / -1;
+.st-metric:nth-child(2) { background: linear-gradient(145deg, #FFFAF0, #FFFDF9); border-color: #F7E8C9; }
+.st-metric:nth-child(3) { background: linear-gradient(145deg, #F3FBF7, #FFFDF9); border-color: #DCF1E7; }
+.st-metric:nth-child(4) { background: linear-gradient(145deg, #F2F9FF, #FFFDF9); border-color: #DCEEFB; }
+.st-metric:nth-child(5) { background: linear-gradient(145deg, #FFF6FA, #FFFDF9); border-color: #FFE3EB; }
+
+@keyframes stRise {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+.st-metric--wide { grid-column: 1 / -1; }
+
+/* 筛选重绘时不再重播入场动画，避免输入时闪动 */
+.st-results.is-settled .st-metric,
+.st-results.is-settled .st-card { animation: none; }
 
 .st-metric--accent {
-  background: linear-gradient(180deg, rgba(108, 140, 255, 0.16), rgba(108, 140, 255, 0.04));
-  border-color: rgba(108, 140, 255, 0.36);
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(255, 224, 232, 0.75), rgba(255, 224, 232, 0) 60%),
+    linear-gradient(140deg, #FFF0F5, #FFFDF9);
+  border-color: #FFD9E4;
 }
 
 .st-metric__label {
   font-size: 12px;
-  color: var(--muted, #8A90A0);
+  font-weight: 600;
+  color: var(--muted, #A28170);
 }
 
 .st-metric__value {
   margin-top: 4px;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
   line-height: 1.25;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+  color: var(--ink, #5B4038);
 }
 
-.st-metric--wide .st-metric__value {
-  font-size: 24px;
-}
+.st-metric--wide .st-metric__value { font-size: 26px; }
 
 .st-metric__sub {
   display: flex;
@@ -381,42 +385,19 @@
   margin-top: 6px;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
 }
 
-.st-metric__subtext {
-  font-variant-numeric: tabular-nums;
-}
+.st-metric__subtext { font-variant-numeric: tabular-nums; }
 
-.st-delta {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
+.st-delta { font-weight: 700; font-variant-numeric: tabular-nums; }
+.st-delta.is-up { color: var(--st-up); }
+.st-delta.is-down { color: var(--st-down); }
+.st-delta.is-flat { color: var(--muted, #A28170); }
 
-.st-delta.is-up {
-  color: var(--st-up);
-}
-
-.st-delta.is-down {
-  color: var(--st-down);
-}
-
-.st-delta.is-flat {
-  color: var(--muted, #8A90A0);
-}
-
-.st-net {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.st-net.is-positive {
-  color: var(--st-down);
-}
-
-.st-net.is-negative {
-  color: var(--st-up);
-}
+.st-net { font-weight: 700; font-variant-numeric: tabular-nums; }
+.st-net.is-positive { color: var(--st-down); }
+.st-net.is-negative { color: var(--st-up); }
 
 /* --------------------------------------------------------------------------
  * §7 图表卡片
@@ -430,61 +411,57 @@
 }
 
 .st-card {
-  padding: 12px;
+  padding: 14px;
   margin-bottom: 12px;
+  animation: stRise 0.46s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.st-charts .st-card {
-  margin-bottom: 0;
-}
-
-.st-card__head {
-  margin-bottom: 6px;
-}
-
-.st-chart {
-  width: 100%;
-  min-width: 0;
-}
+.st-charts .st-card { margin-bottom: 0; }
+.st-card__head { margin-bottom: 6px; }
+.st-chart { width: 100%; min-width: 0; }
 
 .st-chart-empty {
-  padding: 28px 8px;
+  padding: 30px 8px;
   text-align: center;
   font-size: 13px;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
 }
 
 /* 口径切换（我该承担 / 我付的） */
+
 .st-seg {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--border, #242833);
+  padding: 3px;
+  border: 1px solid var(--border, #F1DFD1);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-soft, #FFF1E4);
 }
 
 .st-seg__btn {
-  min-height: 40px;
-  padding: 0 12px;
+  min-height: 38px;
+  padding: 0 13px;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
   font-size: 12px;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .st-seg__btn.is-active {
-  background: rgba(108, 140, 255, 0.2);
-  color: var(--brand, #6C8CFF);
-  font-weight: 600;
+  background: var(--card, #FFFDF9);
+  color: var(--brand-deep, #EF6C90);
+  box-shadow: 0 4px 10px -6px rgba(91, 64, 56, 0.35);
 }
 
 /* 月份步进器 */
+
 .st-stepper {
   display: inline-flex;
   align-items: center;
@@ -495,24 +472,27 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid var(--border, #242833);
+  border: 1.5px solid var(--border, #F1DFD1);
   border-radius: var(--st-radius-sm);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text, #E8EAF0);
+  background: var(--bg-soft, #FFF1E4);
+  color: var(--text-soft, #7C5B50);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.22, 1.35, 0.36, 1), background-color 0.18s ease;
 }
 
 .st-stepper__btn:active {
-  background: rgba(255, 255, 255, 0.1);
+  transform: scale(0.9);
+  background: var(--brand-soft, #FFE4EB);
 }
 
 .st-stepper__label {
-  min-width: 92px;
+  min-width: 96px;
   text-align: center;
   font-size: 13px;
-  color: var(--muted, #8A90A0);
+  font-weight: 650;
+  color: var(--muted, #A28170);
   font-variant-numeric: tabular-nums;
 }
 
@@ -520,14 +500,8 @@
  * §8 记录行（大额消费 / 明细）
  * -------------------------------------------------------------------------- */
 
-.st-list {
-  display: flex;
-  flex-direction: column;
-}
-
-.st-details {
-  min-width: 0;
-}
+.st-list { display: flex; flex-direction: column; }
+.st-details { min-width: 0; }
 
 .st-row {
   display: grid;
@@ -535,36 +509,31 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 52px;
-  padding: 8px 4px;
+  min-height: 54px;
+  padding: 9px 5px;
   border: 0;
-  border-bottom: 1px solid var(--border, #242833);
+  border-bottom: 1px dashed var(--border, #F1DFD1);
   background: none;
   text-align: left;
   cursor: pointer;
 }
 
-.st-row:last-child {
-  border-bottom: 0;
-}
+.st-row:last-child { border-bottom: 0; }
 
 .st-row:active {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--brand-tint, #FFF2F6);
+  border-radius: 10px;
 }
 
 .st-row__date {
   min-width: 38px;
   font-size: 12px;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.st-row__icon {
-  width: 22px;
-  font-size: 17px;
-  text-align: center;
-}
+.st-row__icon { width: 22px; font-size: 17px; text-align: center; }
 
 .st-row__body {
   display: flex;
@@ -575,7 +544,8 @@
 
 .st-row__title {
   font-size: 14px;
-  color: var(--text, #E8EAF0);
+  font-weight: 600;
+  color: var(--ink, #5B4038);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -583,7 +553,7 @@
 
 .st-row__meta {
   font-size: 12px;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -591,24 +561,19 @@
 
 .st-row__amount {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.st-row__amount.is-in {
-  color: var(--st-down);
-}
+.st-row__amount.is-in { color: var(--st-down); }
 
 /* --------------------------------------------------------------------------
  * §9 分类明细表（金额 + 占比细条 + 笔数）
  * -------------------------------------------------------------------------- */
 
-.st-cat-list {
-  display: flex;
-  flex-direction: column;
-}
+.st-cat-list { display: flex; flex-direction: column; }
 
 .st-cat-row {
   display: grid;
@@ -620,32 +585,29 @@
   column-gap: 8px;
   row-gap: 6px;
   width: 100%;
-  min-height: 56px;
-  padding: 8px 4px;
+  min-height: 58px;
+  padding: 9px 5px;
   border: 0;
-  border-bottom: 1px solid var(--border, #242833);
+  border-bottom: 1px dashed var(--border, #F1DFD1);
   background: none;
   text-align: left;
   cursor: pointer;
 }
 
-.st-cat-row:last-child {
-  border-bottom: 0;
-}
+.st-cat-row:last-child { border-bottom: 0; }
 
 .st-cat-row:active {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--brand-tint, #FFF2F6);
+  border-radius: 10px;
 }
 
-.st-cat-row__icon {
-  grid-area: icon;
-  font-size: 17px;
-  text-align: center;
-}
+.st-cat-row__icon { grid-area: icon; font-size: 17px; text-align: center; }
 
 .st-cat-row__name {
   grid-area: name;
   font-size: 14px;
+  font-weight: 600;
+  color: var(--ink, #5B4038);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -654,7 +616,7 @@
 .st-cat-row__amount {
   grid-area: amount;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -662,9 +624,9 @@
 .st-cat-row__bar {
   grid-area: bar;
   display: block;
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
-  background: var(--grid, #2A2F3A);
+  background: var(--bg-soft, #FFF1E4);
   overflow: hidden;
 }
 
@@ -672,7 +634,14 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--brand, #6C8CFF);
+  background: linear-gradient(90deg, #FFC2D2, #FF8FAB);
+  transform-origin: left center;
+  animation: stBarGrow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes stBarGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .st-cat-row__meta {
@@ -681,15 +650,12 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.st-more {
-  width: 100%;
-  margin-top: 10px;
-}
+.st-more { width: 100%; margin-top: 10px; }
 
 /* --------------------------------------------------------------------------
  * §10 空状态
@@ -699,37 +665,40 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 28px 16px;
+  gap: 7px;
+  padding: 30px 18px;
   text-align: center;
 }
 
-.st-empty__emoji {
-  font-size: 30px;
-  line-height: 1.2;
+.st-empty__emoji { font-size: 32px; line-height: 1.2; }
+
+.st-empty__mascot {
+  width: min(200px, 60vw);
+  height: auto;
+  aspect-ratio: 380 / 200;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 12px 20px rgba(185, 126, 75, 0.16));
 }
 
 .st-empty__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text, #E8EAF0);
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ink, #5B4038);
 }
 
 .st-empty__hint {
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--muted, #8A90A0);
+  line-height: 1.65;
+  color: var(--muted, #A28170);
 }
 
-.st-empty .st-btn {
-  margin-top: 8px;
-}
+.st-empty .st-btn { margin-top: 8px; }
 
 .st-inline-empty {
-  padding: 18px 8px;
+  padding: 20px 8px;
   text-align: center;
   font-size: 13px;
-  color: var(--muted, #8A90A0);
+  color: var(--muted, #A28170);
 }
 
 /* --------------------------------------------------------------------------
@@ -737,36 +706,24 @@
  * -------------------------------------------------------------------------- */
 
 @media (min-width: 760px) {
-  .st-page {
-    padding: 16px 16px calc(28px + env(safe-area-inset-bottom, 0px));
-  }
-
+  .st-page { padding: 16px 16px calc(30px + env(safe-area-inset-bottom, 0px)); }
   .st-panel,
-  .st-card {
-    padding: 14px;
-  }
+  .st-card { padding: 16px; }
 
   .st-metrics {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
   }
 
-  .st-metric--wide {
-    grid-column: span 2;
-  }
-
-  .st-metric--wide .st-metric__value {
-    font-size: 26px;
-  }
+  .st-metric--wide { grid-column: span 2; }
+  .st-metric--wide .st-metric__value { font-size: 28px; }
 
   .st-charts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
-  .st-card--wide {
-    grid-column: 1 / -1;
-  }
+  .st-card--wide { grid-column: 1 / -1; }
 }
 
 /* --------------------------------------------------------------------------
@@ -775,7 +732,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .st-chip,
-  .st-btn {
+  .st-btn,
+  .st-metric,
+  .st-card,
+  .st-cat-row__fill {
     transition: none;
+    animation: none;
   }
 }

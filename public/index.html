@@ -3,16 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0F1115">
+<meta name="theme-color" content="#FFF7EC">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>记账本</title>
 <link rel="manifest" href="./manifest.webmanifest">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📒</text></svg>">
+<link rel="icon" type="image/svg+xml" href="./img/favicon.svg">
+<link rel="apple-touch-icon" href="./img/favicon.svg">
 <link rel="stylesheet" href="./css/styles.css">
 <link rel="stylesheet" href="./css/stats.css">
 </head>
 <body>
+
+<!-- 环境装饰：漂浮的小星星 / 爱心 / 爪印，纯装饰不拦截点击 -->
+<div class="ambient" aria-hidden="true">
+  <svg class="ambient__item ambient__item--heart" viewBox="0 0 24 24"><path d="M12 21s-8.5-5.4-8.5-11A4.7 4.7 0 0 1 12 6.7 4.7 4.7 0 0 1 20.5 10c0 5.6-8.5 11-8.5 11Z"/></svg>
+  <svg class="ambient__item ambient__item--star" viewBox="0 0 24 24"><path d="m12 2 2.9 6.6L22 9.6l-5.2 4.9 1.3 7.1L12 18.2l-6.1 3.4 1.3-7.1L2 9.6l7.1-1Z"/></svg>
+  <svg class="ambient__item ambient__item--paw" viewBox="0 0 24 24"><ellipse cx="7" cy="8" rx="2.4" ry="3"/><ellipse cx="12" cy="6.4" rx="2.4" ry="3.2"/><ellipse cx="17" cy="8" rx="2.4" ry="3"/><path d="M12 11.2c3.7 0 6.2 2.4 6.2 5 0 2-1.8 3.2-3.6 2.8-1.7-.4-2.1-.7-2.6-.7s-.9.3-2.6.7c-1.8.4-3.6-.8-3.6-2.8 0-2.6 2.5-5 6.2-5Z"/></svg>
+  <svg class="ambient__item ambient__item--flower" viewBox="0 0 24 24"><circle cx="12" cy="6.2" r="3.1"/><circle cx="17.8" cy="12" r="3.1"/><circle cx="12" cy="17.8" r="3.1"/><circle cx="6.2" cy="12" r="3.1"/><circle cx="12" cy="12" r="2.2" fill="#FFF3C4"/></svg>
+  <span class="ambient__item ambient__item--dot"></span>
+</div>
 
 <!-- ============================================================
      认证页：邮箱验证码注册 / 密码登录
@@ -20,14 +30,15 @@
 <section id="authView" class="auth-view hidden">
   <div class="auth-card">
     <div class="auth-brand">
-      <span class="auth-logo">📒</span>
+      <img class="auth-logo" src="./img/pair.svg" alt="一二和布布">
       <h1>记账本</h1>
-      <p class="auth-slogan">说一句话就记好一笔账</p>
+      <p class="auth-slogan">一二 &amp; 布布陪你，说一句就记好账</p>
     </div>
 
-    <div class="auth-tabs" role="tablist">
-      <button id="authTabLogin" class="auth-tab active" type="button" role="tab">登录</button>
-      <button id="authTabRegister" class="auth-tab" type="button" role="tab">注册</button>
+    <div id="authTabs" class="auth-tabs" role="tablist">
+      <span class="auth-tab__glider" aria-hidden="true"></span>
+      <button id="authTabLogin" class="auth-tab active" type="button" role="tab" aria-selected="true">登录</button>
+      <button id="authTabRegister" class="auth-tab" type="button" role="tab" aria-selected="false">注册</button>
     </div>
 
     <form id="loginForm" class="auth-form" autocomplete="on">
@@ -69,10 +80,12 @@
     </form>
 
     <p class="auth-foot">
-      继续使用即表示你已阅读并同意
-      <a class="auth-link" href="./terms.html">《用户协议》</a>
-      与
-      <a class="auth-link" href="./privacy.html">《隐私政策》</a>
+      <span>继续使用即表示你已阅读并同意</span>
+      <span class="auth-foot-links">
+        <a class="auth-link" href="./terms.html">《用户协议》</a>
+        <span>与</span>
+        <a class="auth-link" href="./privacy.html">《隐私政策》</a>
+      </span>
     </p>
   </div>
 
@@ -86,7 +99,10 @@
   <!-- ---------------- 账本列表（首页） ---------------- -->
   <section id="pageBooks" class="page">
     <header class="nav">
-      <h1 class="nav-title">账本</h1>
+      <div class="nav-brand">
+        <img class="nav-logo" src="./img/favicon.svg" alt="">
+        <h1 class="nav-title">记账本</h1>
+      </div>
       <div class="nav-actions">
         <button id="searchBtn" class="nav-icon" type="button" title="搜索账本和记录" aria-label="搜索">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.2 4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -205,6 +221,7 @@
         <span id="recHint" class="rec-hint">松开发送 · 上滑取消</span>
       </div>
       <div id="recTimer" class="rec-timer">0:00</div>
+      <button id="recCancel" class="rec-cancel" type="button">取消</button>
     </div>
   </div>
 

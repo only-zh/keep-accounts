@@ -67,7 +67,11 @@ export class Store {
               (SELECT msg.content FROM messages msg WHERE msg.book_id = b.id ORDER BY msg.id DESC LIMIT 1) AS last_content,
               (SELECT msg.created_at FROM messages msg WHERE msg.book_id = b.id ORDER BY msg.id DESC LIMIT 1) AS last_at,
               (SELECT a.display_name FROM messages msg JOIN accounts a ON a.id = msg.author_account_id
-                 WHERE msg.book_id = b.id ORDER BY msg.id DESC LIMIT 1) AS last_author
+                 WHERE msg.book_id = b.id ORDER BY msg.id DESC LIMIT 1) AS last_author,
+              (SELECT COUNT(*) FROM message_mentions mm
+                 LEFT JOIN book_reads br ON br.book_id = mm.book_id AND br.account_id = mm.account_id
+                WHERE mm.book_id = b.id AND mm.account_id = m.account_id
+                  AND mm.created_at > COALESCE(br.last_read_at, '')) AS unread_mentions
        FROM books b
        JOIN book_members m ON m.book_id = b.id AND m.account_id = ?
        WHERE b.is_archived = 0
@@ -78,6 +82,7 @@ export class Store {
       isOwner: r.my_role === 'owner',
       memberCount: Number(r.member_count),
       recordCount: Number(r.record_count),
+      unreadMentions: Number(r.unread_mentions || 0),
       maxMembers: this.quotas.maxMembersPerBook,
       lastMessage: r.last_at
         ? { content: r.last_content || '', at: r.last_at, author: r.last_author || '' }
@@ -362,7 +367,11 @@ export class Store {
   assertCanEdit(record, actorId, action = '操作') {
     const membership = this.assertMember(record.bookId, actorId);
     const isAuthor = Number(record.authorAccountId) === Number(actorId);
-    if (isAuthor || MANAGER_ROLES.includes(membership.role)) return { isAuthor, role: membership.role };
+    const isPayer = Number(record.payerAccountId) === Number(actorId);
+    // 作者、账本管理员、以及这笔钱记在他名下的人（被 @ 的人）都可以改
+    if (isAuthor || isPayer || MANAGER_ROLES.includes(membership.role)) {
+      return { isAuthor, isPayer, role: membership.role };
+    }
     throw new HttpError(403, `只能${action}自己发送的记录；需要${action}别人的记录请联系账本管理员`, 'NOT_AUTHOR');
   }
 
@@ -370,7 +379,9 @@ export class Store {
     if (!record || !accountId) return false;
     const m = this.getMembership(record.bookId, accountId);
     if (!m) return false;
-    return Number(record.authorAccountId) === Number(accountId) || MANAGER_ROLES.includes(m.role);
+    return Number(record.authorAccountId) === Number(accountId)
+      || Number(record.payerAccountId) === Number(accountId)
+      || MANAGER_ROLES.includes(m.role);
   }
 
   softDeleteRecord(id, actorId = null) {
@@ -420,7 +431,29 @@ export class Store {
       msg.bookId ?? null, msg.authorAccountId ?? null, msg.role || 'user', msg.kind || 'text',
       msg.content || '', msg.payload ? JSON.stringify(msg.payload) : null, ts,
     );
-    return rowToMessage(this.db.prepare('SELECT * FROM messages WHERE id = ?').get(Number(info.lastInsertRowid)));
+    const id = Number(info.lastInsertRowid);
+    const mentions = Array.isArray(msg.mentions) ? msg.mentions : [];
+    if (mentions.length && msg.bookId) {
+      const stmt = this.db.prepare(
+        'INSERT OR REPLACE INTO message_mentions (message_id, book_id, account_id, created_at) VALUES (?,?,?,?)',
+      );
+      for (const acc of new Set(mentions.map(Number))) {
+        if (!Number.isFinite(acc)) continue;
+        stmt.run(id, Number(msg.bookId), acc, ts);
+      }
+    }
+    return rowToMessage(this.db.prepare('SELECT * FROM messages WHERE id = ?').get(id));
+  }
+
+  /** 记录某人已经读到哪个账本的哪里（用于「有人@我」提示） */
+  touchRead(bookId, accountId) {
+    this.assertMember(bookId, accountId);
+    const ts = nowIso();
+    this.db.prepare(
+      `INSERT INTO book_reads (book_id, account_id, last_read_at) VALUES (?,?,?)
+       ON CONFLICT(book_id, account_id) DO UPDATE SET last_read_at = excluded.last_read_at`,
+    ).run(Number(bookId), Number(accountId), ts);
+    return { lastReadAt: ts };
   }
 
   listMessages({ bookId, before, limit = 200 } = {}) {

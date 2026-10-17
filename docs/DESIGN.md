@@ -66,7 +66,7 @@ settings          key PK, value
 |---|---|---|---|
 | 查看明细 / 表格 / 统计 | ✅ | ✅ | ✅ |
 | 修改/删除**自己发送**的记录 | ✅ | ✅ | ✅ |
-| 修改/删除**任何人**的记录 | ✅ | ✅ | ❌ 403 `NOT_AUTHOR` |
+| 修改/删除**任何人**的记录 | ✅ | ✅ | ❌ 403 `NOT_AUTHOR`（被 @ 的那笔除外） |
 | `@某人` 帮别人记账 | ✅ | ✅ | ❌ @ 被忽略 + 提示 |
 | 分配 / 撤销管理员 | ✅ | ❌ 403 `NOT_OWNER` | ❌ |
 | 移出成员 | ✅ 任何非创建者 | ✅ 仅普通成员（不能移出其他管理员） | ❌ 403 `NOT_OWNER` |
@@ -74,7 +74,7 @@ settings          key PK, value
 
 实现位置：`server/store.js`
 - `assertMember / assertManager / assertOwner` —— 账本作用域的角色断言
-- `assertCanEdit(record, actorId, action)` —— 作者或管理员
+- `assertCanEdit(record, actorId, action)` —— 作者、**被 @ 的人（payer）**或管理员
 - `canEditRecord(record, accountId)` —— 给前端返回 `canEdit` 显示用
 
 `@` 的降级处理在 `shared/chat.js`：普通成员输入里的 `@名字` 会被抹掉（保留名字文本），付款人回落到自己，并在 `reply.warnings` 里说明原因。

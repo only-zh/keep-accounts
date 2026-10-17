@@ -5,6 +5,10 @@
 
     <string name="mic_permission_title">麦克风权限</string>
     <string name="mic_permission_message">记账需要录制语音，请允许使用麦克风。</string>
+    <string name="camera_permission_title">相机权限</string>
+    <string name="camera_permission_message">扫描邀请码需要使用相机，请允许访问。</string>
+    <string name="media_permission_title">权限申请</string>
+    <string name="media_permission_message">记账需要麦克风与相机权限，请允许。</string>
     <string name="allow">允许</string>
     <string name="deny">拒绝</string>
 </resources>

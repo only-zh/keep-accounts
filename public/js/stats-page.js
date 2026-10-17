@@ -253,6 +253,7 @@ export function createStatsPage(options) {
   let calendarRefs = null;         // 日历：{ body, label }
   let debounceTimer = 0;
   let destroyed = false;
+  let resultsSettled = false;      // 首次绘制后的筛选重绘不再重播入场动画
 
   // ------------------------------------------------------------------ 状态读取
 
@@ -726,6 +727,8 @@ export function createStatsPage(options) {
     memberRefs = null;
     calendarRefs = null;
     const results = refs.results;
+    results.classList.toggle('is-settled', resultsSettled);
+    resultsSettled = true;
     clearNode(results);
 
     if (!stats.records.length) {
@@ -748,7 +751,7 @@ export function createStatsPage(options) {
   /** 全量空状态（筛选栏仍然保留在外壳里） */
   function renderEmptyState() {
     return h('section', { class: 'st-card st-empty' }, [
-      h('div', { class: 'st-empty__emoji', text: '🔍' }),
+      h('img', { class: 'st-empty__mascot', attrs: { src: './img/pair.svg', alt: '' } }),
       h('div', { class: 'st-empty__title', text: '这段时间没有符合条件的记录' }),
       h('div', { class: 'st-empty__hint', text: '试试放宽时间范围，或点「重置」清空筛选条件' }),
       h('button', {
@@ -860,6 +863,7 @@ export function createStatsPage(options) {
       ],
     }));
 
+    [...grid.children].forEach((card, i) => card.style.setProperty('--i', String(i)));
     return grid;
   }
 
@@ -1019,7 +1023,7 @@ export function createStatsPage(options) {
       data: rows.map((user, index) => ({
         label: `${user.emoji || '🙂'} ${user.name || '未知'}`,
         value: metric === 'paid' ? (user.paidCents || 0) : (user.shareCents || 0),
-        color: user.color || PALETTE[index % PALETTE.length],
+        color: PALETTE[index % PALETTE.length],
       })),
       horizontal: true,
       valueFormat: formatMoney,
@@ -1230,6 +1234,7 @@ export function createStatsPage(options) {
   /** 全量重建 + 首绘（会重新读取 getState()，用于初始化或成员/账本变化后） */
   function render() {
     if (destroyed) return;
+    resultsSettled = false;
     snapshot = readSnapshot();
     buildShell(snapshot);
     syncControls(snapshot);

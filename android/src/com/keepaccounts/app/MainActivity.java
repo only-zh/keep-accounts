@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
     private static final String KEY_SERVER_URL = "server_url";
 
     private static final int REQ_RECORD_AUDIO = 1001;
+    private static final int REQ_CAMERA = 1002;
 
     private static final String UA_SUFFIX = " KeepAccountsApp/1.0";
 
@@ -235,13 +236,38 @@ public class MainActivity extends Activity {
 
     // ------------------------------------------------------------------ url handling
 
+    /** 用户覆盖过就用它；否则用打包时写进 assets/app-config.json 的地址 */
     String serverUrl() {
         try {
             SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
             String value = sp.getString(KEY_SERVER_URL, "");
-            return value == null ? "" : value.trim();
+            if (value != null && value.trim().length() > 0) {
+                return value.trim();
+            }
         } catch (Throwable t) {
             Log.w(TAG, "could not read server_url", t);
+        }
+        return bakedStartUrl();
+    }
+
+    /**
+     * 读取 build.sh 注入的启动地址。
+     * 正式包加载 https://你的域名 而不是本地 file://——因为 file:// 不是安全上下文，
+     * WebView 在那种页面里既没有 getUserMedia 也没有摄像头能力。
+     */
+    private String bakedStartUrl() {
+        try (java.io.InputStream in = getAssets().open("app-config.json")) {
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[2048];
+            int n;
+            while ((n = in.read(chunk)) > 0) {
+                buf.write(chunk, 0, n);
+            }
+            String json = buf.toString("UTF-8");
+            String value = new JSONObject(json).optString("startUrl", "");
+            return value == null ? "" : value.trim();
+        } catch (Throwable t) {
+            Log.i(TAG, "no baked app-config.json (dev build?)");
             return "";
         }
     }
@@ -430,46 +456,59 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQ_RECORD_AUDIO) {
+        if (requestCode != REQ_RECORD_AUDIO && requestCode != REQ_CAMERA) {
             return;
         }
-        boolean granted = grantResults != null && grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        boolean granted = grantResults != null && grantResults.length > 0;
+        for (int i = 0; i < (grantResults == null ? 0 : grantResults.length); i++) {
+            if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                granted = false;
+            }
+        }
 
         PermissionRequest pending = pendingPermissionRequest;
         pendingPermissionRequest = null;
 
         if (pending == null) {
+            // 启动时预申请麦克风，这里只记日志
             if (granted) {
-                Log.i(TAG, "RECORD_AUDIO granted at startup");
+                Log.i(TAG, "media permission granted at startup");
             } else {
-                Log.w(TAG, "RECORD_AUDIO denied at startup");
-                showToast("未授予录音权限，语音记账将不可用");
+                Log.w(TAG, "media permission denied at startup");
+                showToast("未授予麦克风权限，语音记账将不可用");
             }
             return;
         }
         try {
             if (granted) {
                 pending.grant(pending.getResources());
-                showToast("麦克风已授权");
             } else {
                 pending.deny();
-                showToast("未授予录音权限，无法录音");
+                showToast("没有拿到麦克风/相机权限，该功能不可用");
             }
         } catch (Throwable t) {
             Log.e(TAG, "could not resolve pending permission request", t);
         }
     }
 
-    private void askUserForMic(final PermissionRequest request) {
+    /** 授权确认弹窗：按请求的资源（麦克风/相机）给不同文案 */
+    private void askUserForMedia(final PermissionRequest request, final boolean wantsAudio, final boolean wantsVideo) {
+        int title = R.string.media_permission_title;
+        int message = R.string.media_permission_message;
+        if (wantsVideo && !wantsAudio) {
+            title = R.string.camera_permission_title;
+            message = R.string.camera_permission_message;
+        } else if (wantsAudio && !wantsVideo) {
+            title = R.string.mic_permission_title;
+            message = R.string.mic_permission_message;
+        }
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.mic_permission_title);
-        builder.setMessage(R.string.mic_permission_message);
+        builder.setTitle(title);
+        builder.setMessage(message);
         builder.setCancelable(false);
         builder.setPositiveButton(R.string.allow, (dialog, which) -> {
                 try {
                     request.grant(request.getResources());
-                    showToast("麦克风已授权");
                 } catch (Throwable t) {
                     Log.e(TAG, "grant failed", t);
                 }
@@ -481,7 +520,6 @@ public class MainActivity extends Activity {
                 } catch (Throwable ignored) {
                     // best effort
                 }
-                showToast("已拒绝麦克风权限");
             }
 );
         builder.show();
@@ -554,27 +592,39 @@ public class MainActivity extends Activity {
             try {
                 String[] resources = request.getResources();
                 boolean wantsAudio = false;
+                boolean wantsVideo = false;
                 if (resources != null) {
                     for (int i = 0; i < resources.length; i++) {
                         if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resources[i])) {
                             wantsAudio = true;
-                            break;
+                        } else if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resources[i])) {
+                            wantsVideo = true;
                         }
                     }
                 }
-                if (!wantsAudio) {
-                    Log.w(TAG, "denying non-audio permission request");
+                if (!wantsAudio && !wantsVideo) {
+                    Log.w(TAG, "denying unsupported permission request");
                     request.deny();
                     return;
                 }
-                if (activity.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+
+                // 先补齐系统运行时权限，再让页面拿到资源
+                java.util.ArrayList<String> missing = new java.util.ArrayList<>();
+                if (wantsAudio && activity.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
                         != PackageManager.PERMISSION_GRANTED) {
+                    missing.add(android.Manifest.permission.RECORD_AUDIO);
+                }
+                if (wantsVideo && activity.checkSelfPermission(android.Manifest.permission.CAMERA)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    missing.add(android.Manifest.permission.CAMERA);
+                }
+                if (!missing.isEmpty()) {
                     activity.pendingPermissionRequest = request;
-                    activity.requestPermissions(
-                            new String[]{android.Manifest.permission.RECORD_AUDIO}, REQ_RECORD_AUDIO);
+                    activity.requestPermissions(missing.toArray(new String[0]),
+                            wantsVideo ? REQ_CAMERA : REQ_RECORD_AUDIO);
                     return;
                 }
-                activity.askUserForMic(request);
+                activity.askUserForMedia(request, wantsAudio, wantsVideo);
             } catch (Throwable t) {
                 Log.e(TAG, "onPermissionRequest failed", t);
                 try {

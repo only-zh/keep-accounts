@@ -17,8 +17,8 @@
 
 /** 12 色通用调色板：深色背景上对比清晰、彼此可区分，浅色背景亦可读 */
 export const PALETTE = Object.freeze([
-    '#5b8cff', '#ff8a5b', '#3fd0a4', '#ffd166', '#b07cf5', '#ff6b9d',
-    '#4fc3f7', '#9ccc65', '#ff9f43', '#7c8cff', '#26c6da', '#e57373'
+    '#FF8FAB', '#F2A65A', '#55B390', '#7FBFE8', '#C9A7EB', '#FFC94D',
+    '#F27D8B', '#8ED9BC', '#E8A0C4', '#94B4F0', '#6FC7C9', '#D9A06A'
 ]);
 
 // ============================================================================
@@ -361,11 +361,11 @@ function isAllZero(values) {
 function createTooltip(container) {
     const box = htmlNode('div', {
         position: 'absolute', left: '0px', top: '0px', zIndex: '20', display: 'none', opacity: '0',
-        pointerEvents: 'none', maxWidth: '230px', padding: '6px 9px', borderRadius: '8px',
+        pointerEvents: 'none', maxWidth: '230px', padding: '8px 11px', borderRadius: '12px',
         fontSize: '12px', lineHeight: '1.5', whiteSpace: 'nowrap',
         color: 'var(--text, inherit)', background: 'var(--card, rgba(24, 28, 38, 0.96))',
-        border: '1px solid var(--border, rgba(148, 163, 184, 0.32))',
-        boxShadow: '0 6px 18px rgba(0, 0, 0, 0.35)', transition: 'opacity 120ms ease'
+        border: '1.5px solid var(--border, rgba(148, 163, 184, 0.32))',
+        boxShadow: '0 12px 26px -16px rgba(91, 64, 56, 0.55)', transition: 'opacity 120ms ease'
     }, 'chart-tooltip');
     box.setAttribute('aria-hidden', 'true');
     container.appendChild(box);

@@ -34,6 +34,8 @@ let statsPromise = null;
 let toastTimer = null;
 let codeTimer = null;
 let searchTimer = null;
+let chatPollTimer = null;
+let syncing = false;
 let searchResults = null;
 let scanner = null;
 
@@ -63,6 +65,8 @@ const clear = (node) => { while (node.firstChild) node.removeChild(node.firstChi
 const haptic = (ms = 12) => { try { navigator.vibrate?.(ms); } catch { /* ignore */ } };
 const pad2 = (n) => String(n).padStart(2, '0');
 
+let toastHideTimer = null;
+
 function toast(message, action = null, duration = 3600) {
   const box = $('#toast');
   clear(box);
@@ -70,17 +74,46 @@ function toast(message, action = null, duration = 3600) {
   if (action) {
     box.append(el('button', { type: 'button', text: action.label, onclick: () => { hideToast(); action.onClick(); } }));
   }
-  box.classList.remove('hidden');
+  if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
+  box.classList.remove('hidden', 'is-hiding');
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(hideToast, duration);
 }
 
 function hideToast() {
-  $('#toast').classList.add('hidden');
+  const box = $('#toast');
+  if (!box || box.classList.contains('hidden')) return;
   if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+  if (toastHideTimer) clearTimeout(toastHideTimer);
+  box.classList.add('is-hiding');
+  toastHideTimer = setTimeout(() => {
+    box.classList.add('hidden');
+    box.classList.remove('is-hiding');
+    toastHideTimer = null;
+  }, reduceMotion() ? 0 : 200);
 }
 
 const roleLabel = (role) => ({ owner: '创建者', admin: '管理员', member: '成员' }[role] || '成员');
+
+/** 布布助手头像（所有 assistant 消息共用） */
+const bubuAvatar = () => el('div', { class: 'avatar' }, [
+  el('img', { src: './img/bubu.svg', alt: '' }),
+]);
+
+/** 金额从 0 滚到目标值，让数字也有“呼吸感” */
+function animateCount(node, cents, duration = 640) {
+  if (!node) return;
+  if (reduceMotion()) { node.textContent = formatMoney(cents); return; }
+  const target = Number(cents) || 0;
+  const t0 = performance.now();
+  const tick = (now) => {
+    const p = Math.min(1, (now - t0) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    node.textContent = formatMoney(Math.round(target * eased));
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 
 function fmtClock(iso) {
   const d = new Date(iso);
@@ -144,25 +177,65 @@ const ROOT_PAGES = ['books', 'settings'];
 let pageStack = ['books'];
 const currentPage = () => pageStack[pageStack.length - 1] || 'books';
 
+/** 是否开启了「减少动态效果」 */
+function reduceMotion() {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+}
+
+let pageTransition = 'tab';
+let paintedPage = null;
+
+/** 聊天页每 5 秒增量同步一次，别人发的新消息不用退出重进就能看到 */
+function startChatPolling() {
+  stopChatPolling();
+  chatPollTimer = setInterval(async () => {
+    if (document.hidden || syncing || !store.online) return;
+    syncing = true;
+    try {
+      await store.sync();
+      const b = store.books.find((x) => store.book && String(x.id) === String(store.book.id));
+      if (b && b.unreadMentions) await store.markRead();
+    } catch { /* 网络抖动忽略，下一轮再试 */ } finally { syncing = false; }
+  }, 5000);
+}
+
+function stopChatPolling() {
+  if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+}
+
 function paintPage(name) {
+  if (name !== 'chat') stopChatPolling();
+  const entering = paintedPage !== name;
+  const animate = entering && !reduceMotion();
   for (const [key, id] of Object.entries(PAGE_IDS)) {
-    $(`#${id}`).classList.toggle('hidden', key !== name);
+    const node = $(`#${id}`);
+    node.classList.remove('is-entering-forward', 'is-entering-back', 'is-entering-tab');
+    node.classList.toggle('hidden', key !== name);
+    if (key === name && animate) {
+      void node.offsetWidth; // 强制重排，确保动画从下一帧开始
+      node.classList.add(`is-entering-${pageTransition}`);
+    }
   }
+  paintedPage = name;
   const root = ROOT_PAGES.includes(name);
   $('#tabbar').classList.toggle('hidden', !root);
   $('#tabBooks').classList.toggle('active', name === 'books');
   $('#tabSettings').classList.toggle('active', name === 'settings');
   if (name === 'books') renderBooks();
   if (name === 'settings') renderSettings();
-  if (name === 'chat') renderChat();
+  if (name === 'chat') { renderChat(); startChatPolling(); }
   if (name === 'detail') renderDetail();
-  if (name === 'stats') mountStats();
+  if (name === 'stats') {
+    if (entering) $('#statsMount').scrollTop = 0;
+    mountStats();
+  }
   if (name === 'search') setTimeout(() => $('#searchInput').focus(), 30);
 }
 
 /** 进入子页面（可返回） */
 function navigate(name) {
   if (currentPage() === name) { paintPage(name); return; }
+  pageTransition = 'forward';
   pageStack.push(name);
   try { history.pushState({ page: name }, ''); } catch { /* ignore */ }
   paintPage(name);
@@ -178,6 +251,7 @@ function goBack() {
 
 /** 底部 tab 切换（回到根页面） */
 function switchTab(name) {
+  pageTransition = 'tab';
   pageStack = [name];
   try { history.replaceState({ page: name }, ''); } catch { /* ignore */ }
   paintPage(name);
@@ -186,6 +260,7 @@ function switchTab(name) {
 window.addEventListener('popstate', () => {
   // 扫码浮层打开时，返回键先关浮层
   if (scanner) { scanner(); return; }
+  pageTransition = 'back';
   if (pageStack.length > 1) {
     pageStack.pop();
     paintPage(currentPage());
@@ -206,18 +281,19 @@ function showAuthError(id, message) {
 }
 
 function bindAuth() {
-  const toLogin = () => {
-    $('#authTabLogin').classList.add('active');
-    $('#authTabRegister').classList.remove('active');
-    $('#loginForm').classList.remove('hidden');
-    $('#registerForm').classList.add('hidden');
+  const paintTabs = (register) => {
+    $('#authTabLogin').classList.toggle('active', !register);
+    $('#authTabRegister').classList.toggle('active', register);
+    $('#loginForm').classList.toggle('hidden', register);
+    $('#registerForm').classList.toggle('hidden', !register);
+    $('#authTabs').classList.toggle('is-register', register);
+    $('#authTabLogin').setAttribute('aria-selected', String(!register));
+    $('#authTabRegister').setAttribute('aria-selected', String(register));
+    showAuthError('#loginError', '');
+    showAuthError('#registerError', '');
   };
-  const toRegister = () => {
-    $('#authTabRegister').classList.add('active');
-    $('#authTabLogin').classList.remove('active');
-    $('#registerForm').classList.remove('hidden');
-    $('#loginForm').classList.add('hidden');
-  };
+  const toLogin = () => paintTabs(false);
+  const toRegister = () => paintTabs(true);
   $('#authTabLogin').addEventListener('click', toLogin);
   $('#authTabRegister').addEventListener('click', toRegister);
 
@@ -330,24 +406,55 @@ function previewOf(book) {
   return last.author ? `${last.author}：${text}` : text;
 }
 
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return '夜深啦';
+  if (h < 11) return '早上好';
+  if (h < 14) return '中午好';
+  if (h < 18) return '下午好';
+  return '晚上好';
+}
+
 function renderBooks() {
   const box = $('#bookList');
   clear(box);
   renderOffline();
 
+  const acc = store.account || {};
+  const recordTotal = store.books.reduce((sum, b) => sum + (Number(b.recordCount) || 0), 0);
+
+  box.append(el('div', { class: 'home-hero' }, [
+    el('div', { class: 'hero-copy' }, [
+      el('div', { class: 'hero-hi', text: `${greeting()}，${acc.displayName || '朋友'} ♡` }),
+      el('div', {
+        class: 'hero-title',
+        text: store.books.length ? '今天想记点什么？' : '先建一个小账本吧',
+      }),
+      el('div', { class: 'hero-meta' }, [
+        el('span', { class: 'hero-pill hero-pill--pink', text: `${store.books.length} 个账本` }),
+        el('span', { class: 'hero-pill', text: `累计 ${recordTotal} 笔` }),
+      ]),
+    ]),
+    el('img', { class: 'hero-mascot', src: './img/pair.svg', alt: '' }),
+  ]));
+
   if (!store.books.length) {
-    box.append(el('div', { class: 'empty-page' }, [
-      el('div', { class: 'big', text: '📒' }),
+    box.append(el('div', { class: 'empty-page', style: 'padding-top:22px' }, [
       el('div', { text: '还没有账本' }),
-      el('div', { text: '创建一个家庭账本，或者用邀请码加入家人的账本' }),
+      el('div', { class: 'empty-sub', text: '创建一个家庭账本，或者用邀请码加入家人的账本' }),
       el('button', { type: 'button', text: '创建 / 加入账本', onclick: () => openAddSheet() }),
     ]));
     return;
   }
 
-  for (const book of store.books) {
-    box.append(el('div', {
-      class: 'book-row',
+  box.append(el('div', { class: 'home-section-head' }, [
+    el('div', { class: 'home-section-title', text: '我的账本' }),
+    el('div', { class: 'home-section-count', text: `${store.books.length} 个` }),
+  ]));
+
+  store.books.forEach((book, index) => {
+    const row = el('div', {
+      class: `book-row tone-${index % 3}`,
       onclick: () => openBook(book.id),
       role: 'button',
       tabindex: '0',
@@ -369,13 +476,32 @@ function renderBooks() {
       ]),
       el('div', { class: 'book-side' }, [
         el('div', { class: 'book-time', text: book.lastMessage ? fmtListTime(book.lastMessage.at) : '' }),
+        book.unreadMentions
+          ? el('div', { class: 'book-mention', text: `＠${book.unreadMentions}` })
+          : null,
         el('div', {
           class: 'book-time',
           text: `${book.memberCount}/${store.maxMembers} 人 · ${book.recordCount} 笔`,
         }),
       ]),
-    ]));
-  }
+    ]);
+    row.style.setProperty('--i', String(Math.min(index, 8)));
+    box.append(row);
+  });
+
+  box.append(el('div', {
+    class: 'add-book-card',
+    role: 'button',
+    tabindex: '0',
+    onclick: () => openAddSheet(),
+    onkeydown: (e) => { if (e.key === 'Enter') openAddSheet(); },
+  }, [
+    el('span', { class: 'add-book-plus', text: '＋' }),
+    el('div', {}, [
+      el('div', { class: 'add-book-title', text: '新建 / 加入账本' }),
+      el('div', { class: 'add-book-sub', text: '和家人一起记，每笔都算得清' }),
+    ]),
+  ]));
 }
 
 function renderOffline() {
@@ -390,8 +516,14 @@ async function openBook(bookId) {
     return;
   }
   pendingItems = [];
+  chatRenderedBookId = null; // 重新进入账本时，让最近几条消息再做一次入场动画
   navigate('chat');
   scrollToBottom(true);
+  // 头像 / 插画加载后高度会变，再补一次滚动
+  setTimeout(() => scrollToBottom(true), 160);
+  // 进入账本即视为已读，清掉首页的「有人@我」徽标
+  await store.markRead();
+  renderBooks();
 }
 
 /* ==================================================================== *
@@ -648,7 +780,7 @@ function messageNode(msg) {
   if (warns.length) stack.push(el('div', { class: 'warn-list' }, warns.map((w) => el('div', { class: 'warn-item', text: w }))));
 
   return el('div', { class: 'msg assistant' }, [
-    el('div', { class: 'avatar', text: store.book ? store.book.emoji || '📒' : '📒' }),
+    bubuAvatar(),
     el('div', { class: 'msg-stack' }, stack),
   ]);
 }
@@ -691,6 +823,10 @@ function recordCard(rec) {
   const participants = (rec.participants || []).filter((p) => p.shareCents > 0);
   const isMine = store.account && Number(rec.authorAccountId) === Number(store.account.id);
 
+  const mentionedMe = store.account
+    && Number(rec.payerAccountId) === Number(store.account.id)
+    && Number(rec.authorAccountId) !== Number(store.account.id);
+
   const meta = [
     el('span', { class: 'tag', text: `${fmtDayLabel(rec.occurredDate)}${rec.occurredTime ? ` ${rec.occurredTime}` : ''}` }),
     payer ? el('span', { class: 'tag', text: `💳 ${payer.displayName}${payer.left ? '（已移出）' : ''}` }) : null,
@@ -706,6 +842,7 @@ function recordCard(rec) {
     meta.push(el('span', { class: 'tag warn', text: '大额' }));
   }
   if (deleted) meta.push(el('span', { class: 'tag warn', text: '已删除' }));
+  if (mentionedMe) meta.push(el('span', { class: 'tag mention', text: '＠我' }));
 
   return el('div', {
     class: `card record-card${income ? ' income' : ''}${deleted ? '' : ' tappable'}`,
@@ -779,7 +916,7 @@ function summaryCard(summary, query) {
 
 function parsingCard(label = '解析中') {
   return el('div', { class: 'msg assistant' }, [
-    el('div', { class: 'avatar', text: store.book ? store.book.emoji || '📒' : '📒' }),
+    bubuAvatar(),
     el('div', { class: 'msg-stack' }, [
       el('div', { class: 'card parsing-card' }, [
         el('div', { class: 'skeleton w40 h20' }),
@@ -793,35 +930,113 @@ function parsingCard(label = '解析中') {
   ]);
 }
 
-function renderMessages() {
+let seenMessageIds = new Set();
+let chatRenderedBookId = null;
+
+let lastMessagesSig = '';
+
+/** 消息区内容指纹：轮询命中但没有变化时就不重建 DOM，避免每 5 秒闪一下 */
+function messagesSignature(bid) {
+  const list = store.messages.filter((m) => String(m.bookId) === String(bid));
+  const recs = store.activeRecords();
+  let h = 0;
+  for (const r of recs) h = (h * 31 + Number(r.id) * 7 + Number(r.version || 1)) | 0;
+  const last = list.length ? list[list.length - 1] : null;
+  return [bid, list.length, last ? last.id : 0, recs.length, h,
+    store.failed.length, pendingItems.length, store.members.length].join('|');
+}
+
+function renderMessages(force = false) {
   const box = $('#messages');
   if (!box) return;
-  clear(box);
   const bid = store.book ? store.book.id : null;
+  const sig = messagesSignature(bid);
+  if (!force && sig === lastMessagesSig) return;
+  lastMessagesSig = sig;
+  clear(box);
   const list = store.messages.filter((m) => String(m.bookId) === String(bid));
   const failed = store.failed.filter((f) => String(f.bookId) === String(bid));
 
+  const bookKey = String(bid);
+  const firstPaint = chatRenderedBookId !== bookKey;
+  if (firstPaint) {
+    seenMessageIds = new Set();
+    chatRenderedBookId = bookKey;
+  }
+
+  const animateOrder = new Map();
+  if (firstPaint) {
+    list.slice(-6).forEach((m, i) => animateOrder.set(m.id, i));
+  } else {
+    list.forEach((m) => { if (!seenMessageIds.has(m.id)) animateOrder.set(m.id, 0); });
+  }
+
   if (!list.length && !pendingItems.length && !failed.length) {
     box.append(el('div', { class: 'empty-hint' }, [
-      el('div', { class: 'big', text: '🎙' }),
+      el('img', { class: 'mascot-pair', src: './img/pair.svg', alt: '' }),
       el('div', { text: '按住下面的按钮说一句，比如「昨天午饭 35」' }),
-      el('div', { text: store.isManager ? '你是管理员，可以用「@昵称 买菜 30」帮家人记账' : '账本里所有人的记录都会出现在这里' }),
+      el('div', {
+        class: 'empty-sub',
+        text: store.isManager ? '你是管理员，可以用「@昵称 买菜 30」帮家人记账' : '账本里所有人的记录都会出现在这里',
+      }),
     ]));
   }
-  for (const m of list) box.append(messageNode(m));
-  for (const p of pendingItems) box.append(parsingCard(p.label));
-  for (const f of failed) box.append(failedNode(f));
+
+  for (const m of list) {
+    const node = messageNode(m);
+    if (animateOrder.has(m.id)) {
+      node.classList.add('msg-in');
+      node.style.setProperty('--d', `${animateOrder.get(m.id) * 45}ms`);
+    }
+    seenMessageIds.add(m.id);
+    box.append(node);
+  }
+
+  for (const p of pendingItems) {
+    const node = parsingCard(p.label);
+    node.classList.add('msg-in');
+    box.append(node);
+  }
+
+  for (const f of failed) {
+    const node = failedNode(f);
+    node.classList.add('msg-in');
+    box.append(node);
+  }
+
   scrollToBottom();
 }
 
 let scrollRaf = null;
+
+/** 平滑滚到底部：缓出曲线，避免生硬跳变 */
 function scrollToBottom(force = false) {
   const viewEl = $('#messages');
   if (!viewEl) return;
   const nearBottom = viewEl.scrollHeight - viewEl.scrollTop - viewEl.clientHeight < 240;
   if (!force && !nearBottom) return;
-  if (scrollRaf) cancelAnimationFrame(scrollRaf);
-  scrollRaf = requestAnimationFrame(() => { viewEl.scrollTop = viewEl.scrollHeight; });
+
+  const target = Math.max(0, viewEl.scrollHeight - viewEl.clientHeight);
+  const start = viewEl.scrollTop;
+  const distance = target - start;
+
+  if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
+  if (reduceMotion() || distance < 2) {
+    viewEl.scrollTop = target;
+    return;
+  }
+
+  const duration = Math.min(560, 200 + Math.abs(distance) * 0.5);
+  const t0 = performance.now();
+  const easeOut = (t) => 1 - Math.pow(1 - t, 4);
+
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / duration);
+    viewEl.scrollTop = start + distance * easeOut(p);
+    if (p < 1) scrollRaf = requestAnimationFrame(step);
+    else scrollRaf = null;
+  };
+  scrollRaf = requestAnimationFrame(step);
 }
 
 /* ==================================================================== *
@@ -847,7 +1062,7 @@ async function send(text, { source = 'text' } = {}) {
     toast('当前离线，这条已标红，联网后点「重试」再发送');
     return;
   }
-  const pendingId = addPending('解析中');
+  const pendingId = addPending('布布正在记…');
   scrollToBottom(true);
   try {
     const { reply } = await store.sendMessage(content, { source });
@@ -935,10 +1150,18 @@ async function finishRecording(cancel = false) {
   if (recState !== 'recording' && recState !== 'starting') return;
   const wasStarting = recState === 'starting';
   recState = 'stopping';
-  const elapsed = recorder.elapsed();
-  const result = await recorder.stop(cancel || wasStarting);
-  hideRecOverlay();
-  recState = 'idle';
+  const elapsed = recorder ? recorder.elapsed() : 0;
+  let result = null;
+  try {
+    result = await recorder.stop(cancel || wasStarting);
+  } catch {
+    result = null;
+  } finally {
+    // 关键：浮层与状态必须在 finally 里复位，否则任何异常都会让界面卡住
+    hideRecOverlay();
+    recState = 'idle';
+    cancelArmed = false;
+  }
   if (cancel) return;
   if (!result) {
     toast(elapsed < 500 ? '按久一点再说，说完再松手' : '没有录到声音，再试一次');
@@ -972,28 +1195,62 @@ async function finishRecording(cancel = false) {
 
 function bindVoiceButton() {
   const btn = $('#voiceBtn');
+
+  // 手指按下：开始
   btn.addEventListener('pointerdown', (e) => {
+    if (e.button != null && e.button !== 0) return;
     e.preventDefault();
-    btn.setPointerCapture?.(e.pointerId);
+    startY = e.clientY != null ? e.clientY : 0;
+    cancelArmed = false;
+    try { btn.setPointerCapture?.(e.pointerId); } catch { /* 某些 WebView 不支持 */ }
     beginRecording(e);
   });
-  btn.addEventListener('pointermove', (e) => {
+
+  // 上滑取消：按钮上收到就处理；收不到（手指移出）时由下面的全局监听兜底
+  const trackMove = (e) => {
     if (recState !== 'recording') return;
-    const armed = e.clientY - startY < -60;
+    const y = e.clientY != null ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : startY);
+    const armed = startY - y > 60;
     if (armed !== cancelArmed) {
       cancelArmed = armed;
       $('#recOverlay').classList.toggle('cancelling', armed);
       $('#recState').textContent = armed ? '松开取消' : '正在聆听…';
       $('#recHint').textContent = armed ? '松开手指即取消' : '松开发送 · 上滑取消';
     }
-  });
-  const end = (e) => { e.preventDefault?.(); finishRecording(cancelArmed); };
+  };
+  btn.addEventListener('pointermove', trackMove);
+  document.addEventListener('pointermove', trackMove, { passive: true });
+  document.addEventListener('touchmove', trackMove, { passive: true });
+
+  // 松手/被打断：全部走同一条收尾逻辑（finishRecording 自身幂等）
+  const end = (e) => {
+    if (recState !== 'recording' && recState !== 'starting') return;
+    if (e && e.type !== 'pointerup') cancelArmed = true;   // pointercancel / 触摸中断 = 取消
+    finishRecording(cancelArmed);
+  };
   btn.addEventListener('pointerup', end);
-  btn.addEventListener('pointercancel', () => finishRecording(true));
+  btn.addEventListener('pointercancel', end);
+  document.addEventListener('pointerup', end, true);
+  document.addEventListener('mouseup', end, true);
+  document.addEventListener('touchend', end, { passive: true });
+  document.addEventListener('touchcancel', end, { passive: true });
+  // 切后台 / 失焦：别让它一直挂着
+  document.addEventListener('visibilitychange', () => { if (document.hidden) end({ type: 'pointercancel' }); });
+  window.addEventListener('blur', () => end({ type: 'pointercancel' }));
+
+  // 浮层上的"取消"按钮（即使收不到 pointerup 也能退出）
+  $('#recCancel')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelArmed = true;
+    finishRecording(true);
+  });
+
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 function switchInputMode(mode) {
+  closeMentionList();
   const isVoice = mode === 'voice';
   $('#voiceRow').classList.toggle('hidden', !isVoice);
   $('#textRow').classList.toggle('hidden', isVoice);
@@ -1004,6 +1261,78 @@ function switchInputMode(mode) {
   }
 }
 
+/* ------------------------- @ 成员补全 ------------------------- */
+
+let mention = { open: false, items: [], index: 0, start: 0, end: 0 };
+
+function closeMentionList() {
+  mention = { ...mention, open: false, items: [], index: 0 };
+  document.getElementById('mentionList')?.remove();
+}
+
+function renderMentionList() {
+  let box = document.getElementById('mentionList');
+  if (!box) {
+    box = el('div', { id: 'mentionList', class: 'mention-list' });
+    $('#composer').append(box);
+  }
+  clear(box);
+  if (!mention.items.length) { box.remove(); return; }
+  mention.items.forEach((m, i) => {
+    box.append(el('button', {
+      type: 'button',
+      class: `mention-item${i === mention.index ? ' active' : ''}`,
+      onmousedown: (e) => { e.preventDefault(); pickMention(m); },
+      onclick: (e) => { e.preventDefault(); pickMention(m); },
+    }, [
+      el('span', { class: 'mi-emoji', text: m.emoji || '🙂' }),
+      el('span', { class: 'mi-name', text: m.displayName }),
+      el('span', { class: 'mi-role', text: roleLabel(m.role) }),
+    ]));
+  });
+}
+
+function updateMentionList() {
+  if (!store.isManager) { closeMentionList(); return; }
+  const input = $('#textInput');
+  const value = input.value;
+  const caret = input.selectionStart != null ? input.selectionStart : value.length;
+  const before = value.slice(0, caret);
+  // 光标前最后一个 @ 之后没有空格 → 认为正在输入提及对象
+  const m = before.match(/@([^\s@]{0,20})$/);
+  if (!m) { closeMentionList(); return; }
+  const q = m[1].toLowerCase();
+  const items = store.members
+    .filter((x) => !store.account || Number(x.accountId) !== Number(store.account.id))
+    .filter((x) => {
+      const name = String(x.displayName || '').toLowerCase();
+      return !q || name.includes(q);           // 模糊匹配（子串）
+    })
+    .slice(0, 6);
+  if (!items.length) { closeMentionList(); return; }
+  mention = {
+    open: true,
+    items,
+    index: Math.min(mention.index, items.length - 1),
+    start: caret - m[0].length,
+    end: caret,
+  };
+  renderMentionList();
+}
+
+function pickMention(member) {
+  const input = $('#textInput');
+  const value = input.value;
+  const next = value.slice(0, mention.start) + `@${member.displayName} ` + value.slice(mention.end);
+  input.value = next;
+  const caret = mention.start + String(member.displayName).length + 2;
+  closeMentionList();
+  input.focus();
+  try { input.setSelectionRange(caret, caret); } catch { /* ignore */ }
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(108, input.scrollHeight)}px`;
+}
+
 function bindComposer() {
   $('#keyboardBtn').addEventListener('click', () => switchInputMode('text'));
   $('#micBtn').addEventListener('click', () => switchInputMode('voice'));
@@ -1012,8 +1341,31 @@ function bindComposer() {
     input.style.height = 'auto';
     input.style.height = `${Math.min(108, input.scrollHeight)}px`;
   };
-  input.addEventListener('input', autoGrow);
+  input.addEventListener('input', () => { autoGrow(); updateMentionList(); });
+  input.addEventListener('click', updateMentionList);
+  input.addEventListener('blur', () => setTimeout(closeMentionList, 150));
+  $('#micBtn').addEventListener('click', () => closeMentionList());
   input.addEventListener('keydown', (e) => {
+    if (mention.open) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        mention.index = (mention.index + 1) % mention.items.length;
+        renderMentionList();
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        mention.index = (mention.index - 1 + mention.items.length) % mention.items.length;
+        renderMentionList();
+        return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); closeMentionList(); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        pickMention(mention.items[mention.index]);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       const v = input.value;
@@ -1023,6 +1375,7 @@ function bindComposer() {
     }
   });
   $('#sendBtn').addEventListener('click', () => {
+    closeMentionList();
     const v = input.value;
     input.value = '';
     autoGrow();
@@ -1041,11 +1394,16 @@ function renderDetail() {
   const records = store.activeRecords().slice()
     .sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)));
 
-  box.append(el('div', { class: 'detail-summary' }, [
-    el('div', { class: 'k', text: `本月支出 · ${stats.range.from} ~ ${stats.range.to}` }),
-    el('div', { class: 'v', text: formatMoney(stats.expenseCents) }),
-    el('div', { class: 'k', text: `${stats.count} 笔 · 餐食 ${formatMoney(stats.meal.cents)}（${(stats.meal.share * 100).toFixed(1)}%）` }),
-  ]));
+  const summary = el('div', { class: 'detail-summary' }, [
+    el('div', { class: 'detail-summary__main' }, [
+      el('div', { class: 'k', text: `本月支出 · ${stats.range.from} ~ ${stats.range.to}` }),
+      el('div', { class: 'v', text: formatMoney(stats.expenseCents) }),
+      el('div', { class: 'k', text: `${stats.count} 笔 · 餐食 ${formatMoney(stats.meal.cents)}（${(stats.meal.share * 100).toFixed(1)}%）` }),
+    ]),
+    el('img', { class: 'detail-mascot', src: './img/yier.svg', alt: '' }),
+  ]);
+  box.append(summary);
+  animateCount(summary.querySelector('.v'), stats.expenseCents);
 
   if (!records.length) {
     box.append(el('div', { class: 'empty-page' }, [
@@ -1133,7 +1491,7 @@ function renderSearch() {
   clear(box);
   if (!searchResults) {
     box.append(el('div', { class: 'empty-page' }, [
-      el('div', { class: 'big', text: '🔍' }),
+      el('img', { class: 'mascot-pair', src: './img/pair.svg', alt: '' }),
       el('div', { text: '输入账本名、备注、类别或金额' }),
     ]));
     return;
@@ -1201,23 +1559,41 @@ async function runSearch(q) {
  * 弹层：创建 / 加入 / 扫码 / 成员 / 记录编辑
  * ==================================================================== */
 
+let sheetTimer = null;
+
 function openSheet(build) {
   const body = $('#sheetBody');
+  const sheet = $('#sheet');
+  const mask = $('#sheetMask');
+  if (sheetTimer) { clearTimeout(sheetTimer); sheetTimer = null; }
   clear(body);
+  body.scrollTop = 0;
   build(body, closeSheet);
-  $('#sheetMask').classList.remove('hidden');
-  $('#sheet').classList.remove('hidden');
+  sheet.classList.remove('hidden', 'is-closing');
+  mask.classList.remove('hidden', 'is-closing');
 }
 
 function closeSheet() {
-  $('#sheetMask').classList.add('hidden');
-  $('#sheet').classList.add('hidden');
+  const sheet = $('#sheet');
+  const mask = $('#sheetMask');
+  if (sheet.classList.contains('hidden') || sheet.classList.contains('is-closing')) return;
+  sheet.classList.add('is-closing');
+  mask.classList.add('is-closing');
+  if (sheetTimer) clearTimeout(sheetTimer);
+  sheetTimer = setTimeout(() => {
+    sheet.classList.add('hidden');
+    mask.classList.add('hidden');
+    sheet.classList.remove('is-closing');
+    mask.classList.remove('is-closing');
+    sheetTimer = null;
+  }, reduceMotion() ? 0 : 250);
 }
 
 const field = (labelText, control) => el('div', { class: 'field' }, [el('label', { text: labelText }), control]);
 
 function openAddSheet({ firstRun = false } = {}) {
   openSheet((body, close) => {
+    if (firstRun) body.append(el('img', { class: 'sheet-mascot', src: './img/pair.svg', alt: '' }));
     body.append(el('h3', { text: firstRun ? '先建一个账本' : '加入账本' }));
     body.append(el('p', {
       class: 'quota-line',

@@ -441,8 +441,20 @@ export class Store {
   /** 界面用的权限判断；服务端会再校验一次 */
   canEdit(record) {
     if (!record || !this.account) return false;
-    if (Number(record.authorAccountId) === Number(this.account.id)) return true;
+    const me = Number(this.account.id);
+    if (Number(record.authorAccountId) === me) return true;   // 自己发的
+    if (Number(record.payerAccountId) === me) return true;    // 别人帮我记的（@我）
     return this.isManager;
+  }
+
+  /** 标记本账本已读（清掉「有人@我」） */
+  async markRead() {
+    if (!this.book) return;
+    try {
+      await this.apiRaw(`/api/books/${this.book.id}/read`, { method: 'POST' });
+      const b = this.books.find((x) => String(x.id) === String(this.book.id));
+      if (b) b.unreadMentions = 0;
+    } catch { /* 已读失败不影响使用 */ }
   }
 
   async updateRecord(id, patch, version = null) {

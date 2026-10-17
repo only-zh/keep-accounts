@@ -83,6 +83,24 @@ CREATE TABLE IF NOT EXISTS book_members (
 CREATE INDEX IF NOT EXISTS idx_members_account ON book_members (account_id);
 
 -- ---------------- 账目与消息 ----------------
+-- 成员在某个账本的已读位置（用于「有人@我」提示）
+CREATE TABLE IF NOT EXISTS book_reads (
+  book_id        INTEGER NOT NULL,
+  account_id     INTEGER NOT NULL,
+  last_read_at   TEXT NOT NULL,
+  PRIMARY KEY (book_id, account_id)
+);
+
+-- 消息里被 @ 到的人（被帮记账的人也会落一条）
+CREATE TABLE IF NOT EXISTS message_mentions (
+  message_id  INTEGER NOT NULL,
+  book_id     INTEGER NOT NULL,
+  account_id  INTEGER NOT NULL,
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (message_id, account_id)
+);
+CREATE INDEX IF NOT EXISTS idx_mentions_target ON message_mentions (account_id, book_id, created_at);
+
 CREATE TABLE IF NOT EXISTS records (
   id                  INTEGER PRIMARY KEY AUTOINCREMENT,
   book_id             INTEGER NOT NULL,
@@ -147,7 +165,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 `;
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * 打开（或创建）数据库，并做结构迁移。
